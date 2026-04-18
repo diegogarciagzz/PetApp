@@ -12,7 +12,7 @@ import Supabase
 @MainActor
 class ReportesViewModel: ObservableObject {
     @Published var reportes: [MascotaPerdida]   = []
-    @Published var misMascotas: [MascotaSimple] = []
+    @Published var misMascotas: [MascotaDB] = []
     @Published var isLoading                    = false
     @Published var errorMessage: String?
 
@@ -46,7 +46,7 @@ class ReportesViewModel: ObservableObject {
         do {
             misMascotas = try await client
                 .from("mascota")
-                .select("id_mascota, nombre, tipo_animal, raza")
+                .select()
                 .eq("id_usuario", value: userId)
                 .execute()
                 .value

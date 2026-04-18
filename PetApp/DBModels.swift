@@ -118,6 +118,13 @@ struct MascotaUpdate: Encodable {
     }
 }
 
+/// Mascota + dueño (para búsquedas por usuario).
+struct MascotaConDueno: Identifiable, Hashable {
+    let mascota: MascotaDB
+    let dueno: UsuarioDB
+    var id: UUID { mascota.id }
+}
+
 // MARK: - Reacción
 struct TipoReaccionDB: Identifiable, Decodable, Hashable {
     let id: UUID

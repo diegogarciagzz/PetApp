@@ -214,25 +214,38 @@ final class SocialService {
             .execute()
     }
 
-    // MARK: - Búsqueda de mascotas (para enviar solicitud)
-    func buscarMascotas(query: String, excluyendo: UUID?) async throws -> [MascotaDB] {
+    // MARK: - Búsqueda por usuario (dueño)
+    /// Busca usuarios por nombre, apellidos o correo y devuelve las mascotas de cada uno,
+    /// junto con la info del dueño para mostrarla en la UI.
+    func buscarPorDueno(query: String, excluyendoMascota: UUID?) async throws -> [MascotaConDueno] {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return [] }
 
-        var request = client
-            .from("mascota")
+        let patron = "%\(q)%"
+        let usuarios: [UsuarioDB] = try await client
+            .from("usuario")
             .select()
-            .ilike("nombre", pattern: "%\(q)%")
-
-        if let excluir = excluyendo {
-            request = request.neq("id_mascota", value: excluir)
-        }
-
-        let resultado: [MascotaDB] = try await request
+            .or("nombre.ilike.\(patron),apellidos.ilike.\(patron),correo.ilike.\(patron)")
             .limit(30)
             .execute()
             .value
-        return resultado
+
+        guard !usuarios.isEmpty else { return [] }
+
+        let userIds = usuarios.map { $0.id }
+        let mascotas: [MascotaDB] = try await client
+            .from("mascota")
+            .select()
+            .in("id_usuario", values: userIds)
+            .execute()
+            .value
+
+        let usuariosPorId = Dictionary(uniqueKeysWithValues: usuarios.map { ($0.id, $0) })
+
+        return mascotas.compactMap { m in
+            guard m.id != excluyendoMascota, let u = usuariosPorId[m.idUsuario] else { return nil }
+            return MascotaConDueno(mascota: m, dueno: u)
+        }
     }
 
     /// Trae las mascotas correspondientes a una lista de IDs (para pintar tarjetas de amistad).

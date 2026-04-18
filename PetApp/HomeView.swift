@@ -46,10 +46,7 @@ struct HomeView: View {
                                 ForEach(currentPosts) { post in
                                     PostCardView(
                                         post: post,
-                                        isLiked: vm.estaLike(post),
-                                        totalLikes: vm.totalLikes(post),
                                         totalComentarios: vm.totalComentarios(post),
-                                        onLike: { Task { await vm.toggleLike(post) } },
                                         onComentar: { postConComentarios = post }
                                     )
                                 }
@@ -148,10 +145,7 @@ struct HomeView: View {
 
 struct PostCardView: View {
     let post: FeedPost
-    let isLiked: Bool
-    let totalLikes: Int
     let totalComentarios: Int
-    let onLike: () -> Void
     let onComentar: () -> Void
 
     var body: some View {
@@ -206,41 +200,22 @@ struct PostCardView: View {
                     .foregroundStyle(AppColors.textPrimary)
             }
 
-            HStack(spacing: 18) {
-                Button(action: onLike) {
-                    HStack(spacing: 6) {
-                        Image(systemName: isLiked ? "heart.fill" : "heart")
-                            .foregroundStyle(isLiked ? .red : AppColors.textSecondary)
-                            .scaleEffect(isLiked ? 1.1 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
-
-                        Text("\(totalLikes)")
-                            .foregroundStyle(AppColors.textPrimary)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isLiked ? "Quitar me gusta" : "Dar me gusta")
-
-                Button(action: onComentar) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.left")
-                            .foregroundStyle(AppColors.primary)
-
-                        Text("\(totalComentarios)")
-                            .foregroundStyle(AppColors.textPrimary)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Ver comentarios")
+            HStack(alignment: .center, spacing: 12) {
+                // Barra de reacciones con picker de emojis
+                ReactionBarView(idPublicacion: post.id)
 
                 Spacer()
 
                 Button(action: onComentar) {
-                    Text("Ver más")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppColors.primary)
+                    HStack(spacing: 5) {
+                        Image(systemName: "bubble.left.fill")
+                        Text("\(totalComentarios)")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(AppColors.primary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Ver comentarios")
             }
         }
         .padding(14)
