@@ -15,6 +15,7 @@ class FeedViewModel: ObservableObject {
     @Published var postsAmigos: [FeedPost] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var mostrarNuevaPublicacion = false
 
     // TODO: reemplaza este UUID por el id_mascota del usuario logueado
     let idMascotaActual: UUID = UUID(uuidString: "b1000000-0000-0000-0000-000000000001")!
@@ -22,12 +23,15 @@ class FeedViewModel: ObservableObject {
     private let client = SupabaseManager.shared.client
 
     func cargarFeed() async {
-        isLoading = true
+        // No borra los posts existentes, solo muestra loading si está vacío
+        if postsForyou.isEmpty && postsAmigos.isEmpty {
+            isLoading = true
+        }
         errorMessage = nil
         async let foryou: [FeedPost] = cargarForYou()
         async let amigos: [FeedPost] = cargarAmigos()
-        postsForyou = (try? await foryou) ?? []
-        postsAmigos = (try? await amigos) ?? []
+        postsForyou = (try? await foryou) ?? postsForyou
+        postsAmigos = (try? await amigos) ?? postsAmigos
         isLoading = false
     }
 
