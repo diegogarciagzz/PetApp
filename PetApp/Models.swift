@@ -52,6 +52,7 @@ struct PlaceComment: Identifiable, Hashable {
     let text: String
     let stars: Int
     let date: String
+    var photoURL: String? = nil
 }
 
 struct PetReport: Identifiable {
