@@ -21,13 +21,14 @@ class NuevaPublicacionViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var publicacionExitosa = false
 
-    // TODO: reemplaza por el id_mascota del usuario logueado
-    let idMascotaActual: UUID = UUID(uuidString: "b1000000-0000-0000-0000-000000000001")!
+    /// id de la mascota activa del usuario autenticado.
+    var idMascotaActual: UUID? { UserSession.shared.activePetId }
 
     private let client = SupabaseManager.shared.client
 
     var puedePublicar: Bool {
-        !texto.trimmingCharacters(in: .whitespaces).isEmpty || imagenPreview != nil
+        (!texto.trimmingCharacters(in: .whitespaces).isEmpty || imagenPreview != nil)
+            && idMascotaActual != nil
     }
 
     func cargarImagen(_ item: PhotosPickerItem?) async {
@@ -39,6 +40,10 @@ class NuevaPublicacionViewModel: ObservableObject {
     }
 
     func publicar() async {
+        guard let mascota = idMascotaActual else {
+            errorMessage = "Necesitas registrar una mascota antes de publicar."
+            return
+        }
         isLoading = true
         errorMessage = nil
 
@@ -49,14 +54,14 @@ class NuevaPublicacionViewModel: ObservableObject {
             if let imagen = imagenPreview {
                 urlImagen = try await StorageManager.shared.subirImagen(
                     imagen,
-                    bucket: "publicaciones",
-                    carpeta: idMascotaActual.uuidString
+                    bucket: StorageManager.Bucket.publicaciones,
+                    carpeta: mascota.uuidString
                 )
             }
 
             // 2. Insertar publicación en la DB
             let nuevaPublicacion = NuevaPublicacionPayload(
-                idMascota: idMascotaActual,
+                idMascota: mascota,
                 titulo: titulo.isEmpty ? nil : titulo,
                 texto: texto.isEmpty ? nil : texto,
                 imagen: urlImagen

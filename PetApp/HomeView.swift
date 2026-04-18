@@ -10,6 +10,8 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var vm = FeedViewModel()
     @State private var selectedTab = 0
+    @State private var postConComentarios: FeedPost?
+    @State private var mostrarAmigos = false
 
     private var currentPosts: [FeedPost] {
         selectedTab == 0 ? vm.postsForyou : vm.postsAmigos
@@ -33,14 +35,23 @@ struct HomeView: View {
                             ContentUnavailableView(
                                 selectedTab == 0 ? "Sin publicaciones" : "Sin amigos aún",
                                 systemImage: selectedTab == 0 ? "pawprint.fill" : "person.2.fill",
-                                description: Text(selectedTab == 0
+                                description: Text(
+                                    selectedTab == 0
                                     ? "Aún no hay publicaciones."
-                                    : "Tus amigos no han publicado nada todavía.")
+                                    : "Tus amigos no han publicado nada todavía."
+                                )
                             )
                         } else {
                             LazyVStack(spacing: 16) {
                                 ForEach(currentPosts) { post in
-                                    PostCardView(post: post)
+                                    PostCardView(
+                                        post: post,
+                                        isLiked: vm.estaLike(post),
+                                        totalLikes: vm.totalLikes(post),
+                                        totalComentarios: vm.totalComentarios(post),
+                                        onLike: { Task { await vm.toggleLike(post) } },
+                                        onComentar: { postConComentarios = post }
+                                    )
                                 }
                             }
                         }
@@ -49,8 +60,25 @@ struct HomeView: View {
                 }
             }
             .navigationBarHidden(true)
-            .task { await vm.cargarFeed() }
-            .refreshable { await vm.cargarFeed() }
+            .task {
+                if !UserSession.shared.isLoaded {
+                    await UserSession.shared.refresh()
+                }
+                await vm.cargarFeed()
+            }
+            .refreshable {
+                await vm.cargarFeed()
+            }
+            .sheet(item: $postConComentarios) { post in
+                ComentariosView(post: post) {
+                    vm.incrementarContadorComentarios(post)
+                }
+                .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $mostrarAmigos) {
+                AmigosView()
+                    .presentationDetents([.large])
+            }
         }
     }
 
@@ -60,13 +88,26 @@ struct HomeView: View {
                 Text("Hola 👋")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
+
                 Text("Descubre mascotas")
                     .font(.title2.bold())
                     .foregroundStyle(AppColors.textPrimary)
             }
+
             Spacer()
 
-            // Botón nueva publicación
+            Button {
+                mostrarAmigos = true
+            } label: {
+                Image(systemName: "person.2.fill")
+                    .font(.title3)
+                    .foregroundStyle(AppColors.textPrimary)
+                    .padding(10)
+                    .background(AppColors.card)
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel("Amigos")
+
             Button {
                 vm.mostrarNuevaPublicacion = true
             } label: {
@@ -74,13 +115,7 @@ struct HomeView: View {
                     .font(.title2)
                     .foregroundStyle(AppColors.primary)
             }
-
-            Image(systemName: "bell")
-                .font(.title3)
-                .foregroundStyle(AppColors.textPrimary)
-                .padding(10)
-                .background(AppColors.card)
-                .clipShape(Circle())
+            .accessibilityLabel("Nueva publicación")
         }
         .sheet(isPresented: $vm.mostrarNuevaPublicacion) {
             NuevaPublicacionView()
@@ -113,26 +148,21 @@ struct HomeView: View {
 
 struct PostCardView: View {
     let post: FeedPost
-    @State private var showComentarios = false
+    let isLiked: Bool
+    let totalLikes: Int
+    let totalComentarios: Int
+    let onLike: () -> Void
+    let onComentar: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-
-            // Header
             HStack(spacing: 12) {
-                AsyncImage(url: URL(string: post.fotoMascota ?? "")) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                    default:
-                        Circle()
-                            .fill(AppColors.softBeige)
-                            .overlay(
-                                Image(systemName: "pawprint.fill")
-                                    .foregroundStyle(AppColors.primary)
-                            )
-                    }
-                }
+                RemoteOrDataImage(
+                    urlString: post.fotoMascota,
+                    placeholderSystem: "pawprint.fill",
+                    cornerRadius: 21,
+                    height: 42
+                )
                 .frame(width: 42, height: 42)
                 .clipShape(Circle())
 
@@ -140,6 +170,7 @@ struct PostCardView: View {
                     Text(post.nombreMascota)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
+
                     if let raza = post.raza {
                         Text(raza)
                             .font(.caption)
@@ -154,60 +185,59 @@ struct PostCardView: View {
                     .foregroundStyle(AppColors.textSecondary)
             }
 
-            // Título
             if let titulo = post.titulo {
                 Text(titulo)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
             }
 
-            // Imagen
-            if let imagen = post.imagen, let url = URL(string: imagen) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                    case .failure:
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(AppColors.softBeige.opacity(0.7))
-                            .frame(height: 220)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(AppColors.primary)
-                            )
-                    default:
-                        RoundedRectangle(cornerRadius: 18)
-                            .fill(AppColors.softBeige.opacity(0.7))
-                            .frame(height: 220)
-                            .overlay(ProgressView())
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 220)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
+            if let imagen = post.imagen, !imagen.isEmpty {
+                RemoteOrDataImage(
+                    urlString: imagen,
+                    placeholderSystem: "photo",
+                    cornerRadius: 18,
+                    height: 220
+                )
             }
 
-            // Texto
             if let texto = post.texto {
                 Text(texto)
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textPrimary)
             }
 
-            // Footer
-            HStack(alignment: .center, spacing: 12) {
-                // 👇 Reacciones reales con picker
-                ReactionBarView(idPublicacion: post.id)
+            HStack(spacing: 18) {
+                Button(action: onLike) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                            .foregroundStyle(isLiked ? .red : AppColors.textSecondary)
+                            .scaleEffect(isLiked ? 1.1 : 1.0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
+
+                        Text("\(totalLikes)")
+                            .foregroundStyle(AppColors.textPrimary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isLiked ? "Quitar me gusta" : "Dar me gusta")
+
+                Button(action: onComentar) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left")
+                            .foregroundStyle(AppColors.primary)
+
+                        Text("\(totalComentarios)")
+                            .foregroundStyle(AppColors.textPrimary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ver comentarios")
 
                 Spacer()
 
-                // Comentarios
-                Button {
-                    showComentarios = true
-                } label: {
-                    Label("\(post.totalComentarios)", systemImage: "bubble.left.fill")
-                        .font(.caption.weight(.medium))
+                Button(action: onComentar) {
+                    Text("Ver más")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.primary)
                 }
                 .buttonStyle(.plain)
@@ -216,11 +246,6 @@ struct PostCardView: View {
         .padding(14)
         .background(AppColors.card)
         .clipShape(RoundedRectangle(cornerRadius: AppSpacing.cardCorner))
-        .sheet(isPresented: $showComentarios) {
-            ComentariosView(post: post)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
     }
 }
 

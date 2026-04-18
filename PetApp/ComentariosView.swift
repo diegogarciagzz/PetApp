@@ -2,22 +2,24 @@
 //  ComentariosView.swift
 //  PetApp
 //
-//  Created by Alumno on 18/04/26.
+//  Sheet para ver y publicar comentarios de una publicación.
 //
 
 import SwiftUI
 
 struct ComentariosView: View {
     let post: FeedPost
-    @StateObject private var vm: ComentariosViewModel
-    @State private var textoNuevo = ""
-    @FocusState private var inputFocused: Bool
+    var onComentarioNuevo: () -> Void = {}
+
     @Environment(\.dismiss) private var dismiss
 
-    init(post: FeedPost) {
-        self.post = post
-        _vm = StateObject(wrappedValue: ComentariosViewModel(idPublicacion: post.id))
-    }
+    @State private var comentarios: [ComentarioConAutor] = []
+    @State private var texto: String = ""
+    @State private var cargando = false
+    @State private var enviando = false
+    @State private var error: String?
+
+    private var mascotaActualId: UUID? { UserSession.shared.activePetId }
 
     var body: some View {
         NavigationStack {
@@ -25,183 +27,185 @@ struct ComentariosView: View {
                 AppColors.background.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Header de la publicación
-                    postResumen
-                        .padding(AppSpacing.screenPadding)
-                    
-                    Divider().padding(.horizontal, AppSpacing.screenPadding)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 10) {
+                            RemoteOrDataImage(
+                                urlString: post.fotoMascota,
+                                placeholderSystem: "pawprint.fill",
+                                cornerRadius: 18
+                            )
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
 
-                    // Lista de comentarios
-                    if vm.isLoading {
+                            Text(post.nombreMascota)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppColors.textPrimary)
+
+                            Spacer()
+                        }
+
+                        if let t = post.titulo, !t.isEmpty {
+                            Text(t)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppColors.textPrimary)
+                        }
+
+                        if let tx = post.texto, !tx.isEmpty {
+                            Text(tx)
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
+                                .lineLimit(3)
+                        }
+                    }
+                    .padding()
+                    .background(AppColors.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, AppSpacing.screenPadding)
+                    .padding(.top, 8)
+
+                    if cargando && comentarios.isEmpty {
                         Spacer()
                         ProgressView()
                         Spacer()
-                    } else if vm.comentarios.isEmpty {
+                    } else if comentarios.isEmpty {
                         Spacer()
-                        VStack(spacing: 12) {
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.system(size: 40))
-                                .foregroundStyle(AppColors.textSecondary)
-                            Text("Sé el primero en comentar")
-                                .font(.subheadline)
-                                .foregroundStyle(AppColors.textSecondary)
-                        }
+                        ContentUnavailableView(
+                            "Sin comentarios",
+                            systemImage: "bubble.left",
+                            description: Text("Sé el primero en comentar.")
+                        )
                         Spacer()
                     } else {
-                        ScrollViewReader { proxy in
-                            ScrollView {
-                                LazyVStack(spacing: 12) {
-                                    ForEach(vm.comentarios) { comentario in
-                                        ComentarioRowView(comentario: comentario)
-                                            .id(comentario.id)
-                                    }
-                                }
-                                .padding(AppSpacing.screenPadding)
-                            }
-                            .onChange(of: vm.comentarios.count) { _, _ in
-                                if let last = vm.comentarios.last {
-                                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 10) {
+                                ForEach(comentarios) { c in
+                                    comentarioRow(c)
                                 }
                             }
+                            .padding(.horizontal, AppSpacing.screenPadding)
+                            .padding(.top, 10)
                         }
                     }
 
-                    // Input de nuevo comentario
-                    inputBar
+                    if let error = error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, AppSpacing.screenPadding)
+                    }
+
+                    HStack(spacing: 10) {
+                        TextField("Escribe un comentario...", text: $texto, axis: .vertical)
+                            .lineLimit(1...4)
+                            .padding(10)
+                            .background(AppColors.card)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                        Button {
+                            Task { await publicar() }
+                        } label: {
+                            if enviando {
+                                ProgressView().tint(AppColors.primary)
+                            } else {
+                                Image(systemName: "paperplane.fill")
+                                    .foregroundStyle(.white)
+                                    .padding(12)
+                                    .background(puedeEnviar ? AppColors.primary : AppColors.textSecondary.opacity(0.4))
+                                    .clipShape(Circle())
+                            }
+                        }
+                        .disabled(!puedeEnviar || enviando)
+                        .buttonStyle(.plain)
+                    }
+                    .padding(AppSpacing.screenPadding)
+                    .background(AppColors.background.opacity(0.95))
                 }
             }
             .navigationTitle("Comentarios")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Cerrar") { dismiss() }
                         .foregroundStyle(AppColors.primary)
                 }
             }
-            .task { await vm.cargarComentarios() }
-            .alert("Error", isPresented: .constant(vm.errorMessage != nil)) {
-                Button("OK") { vm.errorMessage = nil }
-            } message: {
-                Text(vm.errorMessage ?? "")
-            }
+            .task { await cargar() }
         }
     }
 
-    // MARK: - Resumen del post arriba
-    private var postResumen: some View {
-        HStack(spacing: 10) {
-            AsyncImage(url: URL(string: post.fotoMascota ?? "")) { phase in
-                if case .success(let img) = phase {
-                    img.resizable().scaledToFill()
-                } else {
-                    Circle().fill(AppColors.softBeige)
-                        .overlay(Image(systemName: "pawprint.fill").foregroundStyle(AppColors.primary))
-                }
-            }
-            .frame(width: 38, height: 38)
-            .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(post.nombreMascota)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-                if let titulo = post.titulo {
-                    Text(titulo)
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer()
-            Label("\(vm.comentarios.count)", systemImage: "bubble.left.fill")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(AppColors.primary)
-        }
+    private var puedeEnviar: Bool {
+        !texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && mascotaActualId != nil
     }
 
-    // MARK: - Barra de input
-    private var inputBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 10) {
-                TextField("Escribe un comentario...", text: $textoNuevo, axis: .vertical)
-                    .lineLimit(1...4)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(AppColors.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .focused($inputFocused)
-
-                Button {
-                    let texto = textoNuevo.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !texto.isEmpty else { return }
-                    textoNuevo = ""
-                    inputFocused = false
-                    Task { await vm.enviarComentario(texto: texto) }
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(textoNuevo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                  ? AppColors.softBeige : AppColors.primary)
-                            .frame(width: 40, height: 40)
-                        if vm.isSending {
-                            ProgressView().tint(.white).scaleEffect(0.7)
-                        } else {
-                            Image(systemName: "arrow.up")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(
-                                    textoNuevo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                    ? AppColors.textSecondary : .white
-                                )
-                        }
-                    }
-                }
-                .disabled(textoNuevo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isSending)
-            }
-            .padding(.horizontal, AppSpacing.screenPadding)
-            .padding(.vertical, 10)
-            .background(AppColors.background)
-        }
-    }
-}
-
-// MARK: - Fila de comentario
-struct ComentarioRowView: View {
-    let comentario: Comentario
-
-    var body: some View {
+    private func comentarioRow(_ c: ComentarioConAutor) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            AsyncImage(url: URL(string: comentario.fotoMascota ?? "")) { phase in
-                if case .success(let img) = phase {
-                    img.resizable().scaledToFill()
-                } else {
-                    Circle().fill(AppColors.softBeige)
-                        .overlay(Image(systemName: "pawprint.fill")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.primary))
-                }
-            }
-            .frame(width: 34, height: 34)
+            RemoteOrDataImage(
+                urlString: c.fotoMascota,
+                placeholderSystem: "pawprint.fill",
+                cornerRadius: 16
+            )
+            .frame(width: 32, height: 32)
             .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(comentario.nombreMascota)
+                HStack(spacing: 6) {
+                    Text(c.nombreMascota ?? "Mascota")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
-                    Text(comentario.fechaComentario.formatted(.relative(presentation: .named)))
+
+                    Text(c.fechaComentario.formatted(.relative(presentation: .named)))
                         .font(.caption2)
                         .foregroundStyle(AppColors.textSecondary)
                 }
-                Text(comentario.texto)
+
+                Text(c.texto)
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
+
             Spacer()
         }
-        .padding(12)
+        .padding(10)
         .background(AppColors.card)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func cargar() async {
+        cargando = true
+        error = nil
+
+        do {
+            comentarios = try await SocialService.shared.comentarios(publicacion: post.id)
+        } catch {
+            self.error = "No se pudieron cargar los comentarios."
+        }
+
+        cargando = false
+    }
+
+    private func publicar() async {
+        guard let mascota = mascotaActualId else {
+            error = "Necesitas una mascota para comentar."
+            return
+        }
+
+        let contenido = texto.trimmingCharacters(in: .whitespacesAndNewlines)
+        enviando = true
+        error = nil
+
+        do {
+            try await SocialService.shared.publicarComentario(
+                publicacion: post.id,
+                mascota: mascota,
+                texto: contenido
+            )
+            texto = ""
+            onComentarioNuevo()
+            await cargar()
+        } catch {
+            self.error = "No se pudo publicar: \(error.localizedDescription)"
+        }
+
+        enviando = false
     }
 }

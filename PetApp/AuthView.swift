@@ -20,12 +20,14 @@ struct AuthView: View {
         if viewModel.isLoggedIn {
             if viewModel.isNewUser {
                 FirstPetOnboardingView(viewModel: viewModel)
+                    .environment(viewModel)
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing),
                         removal: .move(edge: .leading)
                     ))
             } else {
                 MainTabView()
+                    .environment(viewModel)
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing),
                         removal: .move(edge: .leading)
