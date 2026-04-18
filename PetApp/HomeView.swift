@@ -5,18 +5,14 @@
 //  Created by Alumno on 18/04/26.
 //
 
-
 import SwiftUI
 
 struct HomeView: View {
+    @StateObject private var vm = FeedViewModel()
     @State private var selectedTab = 0
 
-    private var filteredPosts: [Post] {
-        if selectedTab == 0 {
-            return MockData.posts
-        } else {
-            return MockData.posts.filter { $0.isFriendPost }
-        }
+    private var currentPosts: [FeedPost] {
+        selectedTab == 0 ? vm.postsForyou : vm.postsAmigos
     }
 
     var body: some View {
@@ -29,9 +25,23 @@ struct HomeView: View {
                         header
                         segmentedControl
 
-                        LazyVStack(spacing: 16) {
-                            ForEach(filteredPosts) { post in
-                                PostCardView(post: post)
+                        if vm.isLoading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 40)
+                        } else if currentPosts.isEmpty {
+                            ContentUnavailableView(
+                                selectedTab == 0 ? "Sin publicaciones" : "Sin amigos aún",
+                                systemImage: selectedTab == 0 ? "pawprint.fill" : "person.2.fill",
+                                description: Text(selectedTab == 0
+                                    ? "Aún no hay publicaciones."
+                                    : "Tus amigos no han publicado nada todavía.")
+                            )
+                        } else {
+                            LazyVStack(spacing: 16) {
+                                ForEach(currentPosts) { post in
+                                    PostCardView(post: post)
+                                }
                             }
                         }
                     }
@@ -39,6 +49,8 @@ struct HomeView: View {
                 }
             }
             .navigationBarHidden(true)
+            .task { await vm.cargarFeed() }
+            .refreshable { await vm.cargarFeed() }
         }
     }
 
@@ -48,14 +60,11 @@ struct HomeView: View {
                 Text("Hola 👋")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-
                 Text("Descubre mascotas")
                     .font(.title2.bold())
                     .foregroundStyle(AppColors.textPrimary)
             }
-
             Spacer()
-
             Image(systemName: "bell")
                 .font(.title3)
                 .foregroundStyle(AppColors.textPrimary)
@@ -74,7 +83,9 @@ struct HomeView: View {
 
     private func segmentButton(title: String, index: Int) -> some View {
         Button {
-            selectedTab = index
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedTab = index
+            }
         } label: {
             Text(title)
                 .font(.subheadline.weight(.semibold))
@@ -88,61 +99,100 @@ struct HomeView: View {
 }
 
 struct PostCardView: View {
-    let post: Post
+    let post: FeedPost
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+
+            // Header
             HStack(spacing: 12) {
-                Circle()
-                    .fill(AppColors.softBeige)
-                    .frame(width: 42, height: 42)
-                    .overlay(
-                        Image(systemName: "pawprint.fill")
-                            .foregroundStyle(AppColors.primary)
-                    )
+                AsyncImage(url: URL(string: post.fotoMascota ?? "")) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                    default:
+                        Circle()
+                            .fill(AppColors.softBeige)
+                            .overlay(
+                                Image(systemName: "pawprint.fill")
+                                    .foregroundStyle(AppColors.primary)
+                            )
+                    }
+                }
+                .frame(width: 42, height: 42)
+                .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(post.userName)
+                    Text(post.nombreMascota)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
-
-                    Text(post.userHandle)
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
+                    if let raza = post.raza {
+                        Text(raza)
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
                 }
 
                 Spacer()
 
-                Image(systemName: "ellipsis")
+                Text(post.fechaPublicacion.formatted(.relative(presentation: .named)))
+                    .font(.caption2)
                     .foregroundStyle(AppColors.textSecondary)
             }
 
-            RoundedRectangle(cornerRadius: 18)
-                .fill(AppColors.softBeige.opacity(0.7))
-                .frame(height: 220)
-                .overlay(
-                    VStack {
-                        Image(systemName: "photo")
-                            .font(.system(size: 40))
-                            .foregroundStyle(AppColors.primary)
+            // Título
+            if let titulo = post.titulo {
+                Text(titulo)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+            }
 
-                        Text(post.imageName)
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
+            // Imagen
+            if let imagen = post.imagen, let url = URL(string: imagen) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                    case .failure:
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(AppColors.softBeige.opacity(0.7))
+                            .frame(height: 220)
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(AppColors.primary)
+                            )
+                    default:
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(AppColors.softBeige.opacity(0.7))
+                            .frame(height: 220)
+                            .overlay(ProgressView())
                     }
-                )
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
 
-            Text(post.caption)
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textPrimary)
+            // Texto
+            if let texto = post.texto {
+                Text(texto)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textPrimary)
+            }
 
+            // Footer
             HStack(spacing: 18) {
-                Label("\(post.likes)", systemImage: "heart")
-                Label("\(post.comments)", systemImage: "message")
-                Label("Guardar", systemImage: "bookmark")
+                Label("\(post.totalReacciones)", systemImage: "heart.fill")
+                    .foregroundStyle(.red.opacity(0.8))
+                Label("\(post.totalComentarios)", systemImage: "bubble.left.fill")
+                    .foregroundStyle(AppColors.primary)
+                Spacer()
+                Text("Ver más")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.primary)
             }
             .font(.caption.weight(.medium))
-            .foregroundStyle(AppColors.textSecondary)
         }
         .padding(14)
         .background(AppColors.card)
