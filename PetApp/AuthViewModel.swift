@@ -15,6 +15,7 @@ import Supabase
 class AuthViewModel {
     var isLoggedIn: Bool = false
     var isLoading: Bool = false
+    var isNewUser: Bool = false
     var errorMessage: String? = nil
 
     private let client = SupabaseManager.shared.client
