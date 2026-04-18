@@ -196,22 +196,22 @@ struct PostCardView: View {
             }
 
             // Footer
-            HStack(spacing: 18) {
-                Label("\(post.totalReacciones)", systemImage: "heart.fill")
-                    .foregroundStyle(.red.opacity(0.8))
+            HStack(alignment: .center, spacing: 12) {
+                // 👇 Reacciones reales con picker
+                ReactionBarView(idPublicacion: post.id)
+
+                Spacer()
+
+                // Comentarios
                 Button {
                     showComentarios = true
                 } label: {
                     Label("\(post.totalComentarios)", systemImage: "bubble.left.fill")
+                        .font(.caption.weight(.medium))
                         .foregroundStyle(AppColors.primary)
                 }
                 .buttonStyle(.plain)
-                Spacer()
-                Text("Ver más")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppColors.primary)
             }
-            .font(.caption.weight(.medium))
         }
         .padding(14)
         .background(AppColors.card)

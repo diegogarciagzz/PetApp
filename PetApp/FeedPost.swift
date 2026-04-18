@@ -29,6 +29,7 @@ struct FeedPost: Identifiable, Decodable {
         case popularidad
     }
 }
+
 struct FeedPostAmigos: Decodable {
     let id: UUID
     let titulo: String?
