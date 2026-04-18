@@ -2,19 +2,21 @@
 //  ProfileView.swift
 //  PetApp
 //
-//  Created by Alumno on 18/04/26.
-//
 
 import SwiftUI
 
 struct ProfileView: View {
     let user = MockData.user
 
+    @State private var pets: [Pet] = MockData.pets
     @State private var showEditProfile = false
     @State private var showShareAlert = false
     @State private var selectedMenuTitle: String?
-    @State private var selectedPet: Pet?
     @State private var selectedBadge: String?
+    @State private var showAddPet = false
+    @State private var petToEdit: Pet? = nil
+    @State private var petToDelete: Pet? = nil
+    @State private var showDeleteAlert = false
 
     var body: some View {
         NavigationStack {
@@ -41,9 +43,19 @@ struct ProfileView: View {
                 EditProfileView(user: user)
                     .presentationDetents([.medium, .large])
             }
-            .sheet(item: $selectedPet) { pet in
-                PetDetailSheet(pet: pet)
-                    .presentationDetents([.medium])
+            .sheet(isPresented: $showAddPet) {
+                AddEditPetView(existingPet: nil) { newPet in
+                    pets.append(newPet)
+                }
+                .presentationDetents([.medium, .large])
+            }
+            .sheet(item: $petToEdit) { pet in
+                AddEditPetView(existingPet: pet) { updatedPet in
+                    if let index = pets.firstIndex(where: { $0.id == updatedPet.id }) {
+                        pets[index] = updatedPet
+                    }
+                }
+                .presentationDetents([.medium, .large])
             }
             .sheet(item: $selectedMenuTitle) { title in
                 MenuDetailSheet(title: title)
@@ -52,6 +64,14 @@ struct ProfileView: View {
             .sheet(item: $selectedBadge) { badge in
                 BadgeDetailSheet(badgeTitle: badge)
                     .presentationDetents([.medium])
+            }
+            .alert("Eliminar mascota", isPresented: $showDeleteAlert, presenting: petToDelete) { pet in
+                Button("Eliminar", role: .destructive) {
+                    pets.removeAll { $0.id == pet.id }
+                }
+                Button("Cancelar", role: .cancel) {}
+            } message: { pet in
+                Text("¿Estás seguro de que quieres eliminar a \(pet.name)?")
             }
             .alert("Perfil compartido", isPresented: $showShareAlert) {
                 Button("OK", role: .cancel) { }
@@ -101,23 +121,21 @@ struct ProfileView: View {
     // MARK: - Stats
     private var statsSection: some View {
         HStack(spacing: 12) {
-            StatCard(title: "Mascotas", value: "\(user.petsCount)")
+            StatCard(title: "Mascotas", value: "\(pets.count)")
             StatCard(title: "Posts", value: "\(user.postsCount)")
             StatCard(title: "Reportes", value: "\(user.reportsCount)")
         }
     }
 
-    // MARK: - Quick actions
+    // MARK: - Quick Actions
     private var quickActions: some View {
         HStack(spacing: 12) {
             Button {
                 showEditProfile = true
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "square.and.pencil")
-                        .accessibilityHidden(true)
-                    Text("Editar perfil")
-                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "square.and.pencil").accessibilityHidden(true)
+                    Text("Editar perfil").font(.subheadline.weight(.semibold))
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -132,10 +150,8 @@ struct ProfileView: View {
                 showShareAlert = true
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.up")
-                        .accessibilityHidden(true)
-                    Text("Compartir")
-                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "square.and.arrow.up").accessibilityHidden(true)
+                    Text("Compartir").font(.subheadline.weight(.semibold))
                 }
                 .foregroundStyle(AppColors.textPrimary)
                 .frame(maxWidth: .infinity)
@@ -152,7 +168,6 @@ struct ProfileView: View {
     private var badgesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Logros")
-
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     badgeCard(title: "Rescatista", subtitle: "3 reportes creados", icon: "heart.fill")
@@ -172,16 +187,13 @@ struct ProfileView: View {
                     Circle()
                         .fill(AppColors.softBeige)
                         .frame(width: 42, height: 42)
-
                     Image(systemName: icon)
                         .foregroundStyle(AppColors.primary)
                         .accessibilityHidden(true)
                 }
-
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
-
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(AppColors.textSecondary)
@@ -197,84 +209,145 @@ struct ProfileView: View {
     }
 
     // MARK: - Pets
-    // MARK: - Pets
     private var petsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Mis mascotas")
+            HStack {
+                sectionTitle("Mis mascotas")
+                Spacer()
+                Button {
+                    showAddPet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Agregar")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(AppColors.primary)
+                }
+                .accessibilityLabel("Agregar mascota")
+            }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(MockData.pets) { pet in
+            if pets.isEmpty {
+                VStack(spacing: 12) {
+                    Text("🐾")
+                        .font(.system(size: 40))
+                    Text("Aún no tienes mascotas registradas")
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.center)
                     Button {
-                        selectedPet = pet
+                        showAddPet = true
                     } label: {
-                        VStack(spacing: 8) {
-                            Text(pet.emoji)
-                                .font(.system(size: 40))
-                                .accessibilityHidden(true)
-
-                            Text(pet.name)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppColors.textPrimary)
-
-                            Text(pet.breed)
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-                                .multilineTextAlignment(.center)
-
-                            Text(pet.type.rawValue)
-                                .font(.caption2)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(pet.type == .dog ? AppColors.primary :
-                                           pet.type == .cat ? Color.orange :
-                                           pet.type == .turtle ? Color.green :
-                                           pet.type == .rabbit ? Color.pink :
-                                           pet.type == .hamster ? Color.yellow :
-                                           pet.type == .bird ? Color.blue : AppColors.primary)
-                                .clipShape(Capsule())
-
-                            Text(pet.age)
-                                .font(.caption2)
-                                .foregroundStyle(AppColors.primary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(AppColors.softBeige.opacity(0.7))
-                                .clipShape(Capsule())
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(14)
-                        .background(AppColors.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        Text("+ Agregar primera mascota")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(AppColors.primary)
+                            .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Mascota: \(pet.name), \(pet.breed), \(pet.type.rawValue), \(pet.age)")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(AppColors.card)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(pets) { pet in
+                        petCard(pet: pet)
+                    }
                 }
             }
         }
     }
-    // MARK: - Recent activity
+
+    private func petCard(pet: Pet) -> some View {
+        VStack(spacing: 8) {
+            Text(pet.emoji)
+                .font(.system(size: 40))
+                .accessibilityHidden(true)
+
+            Text(pet.name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text(pet.breed)
+                .font(.caption)
+                .foregroundStyle(AppColors.textSecondary)
+                .multilineTextAlignment(.center)
+
+            Text(pet.type.rawValue)
+                .font(.caption2)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(colorForPetType(pet.type))
+                .clipShape(Capsule())
+
+            Text(pet.age)
+                .font(.caption2)
+                .foregroundStyle(AppColors.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(AppColors.softBeige.opacity(0.7))
+                .clipShape(Capsule())
+
+            // Botones editar / eliminar
+            HStack(spacing: 10) {
+                Button {
+                    petToEdit = pet
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppColors.primary)
+                        .padding(8)
+                        .background(AppColors.softBeige)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Editar \(pet.name)")
+
+                Button {
+                    petToDelete = pet
+                    showDeleteAlert = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .padding(8)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Eliminar \(pet.name)")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(14)
+        .background(AppColors.card)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func colorForPetType(_ type: PetType) -> Color {
+        switch type {
+        case .dog: return AppColors.primary
+        case .cat: return .orange
+        case .turtle: return .green
+        case .rabbit: return .pink
+        case .hamster: return .yellow
+        case .bird: return .blue
+        case .other: return AppColors.primary
+        }
+    }
+
+    // MARK: - Recent Activity
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Actividad reciente")
-
-            activityCard(
-                title: "Reporte creado",
-                subtitle: "Publicaste un reporte para Luna en Cumbres.",
-                icon: "exclamationmark.bubble.fill"
-            )
-
-            activityCard(
-                title: "Lugar guardado",
-                subtitle: "Agregaste Parque Rufino Tamayo a tus favoritos.",
-                icon: "bookmark.fill"
-            )
-
-            activityCard(
-                title: "Coincidencia IA",
-                subtitle: "La IA detectó una posible coincidencia cercana a tu zona.",
-                icon: "sparkles"
-            )
+            activityCard(title: "Reporte creado", subtitle: "Publicaste un reporte para Luna en Cumbres.", icon: "exclamationmark.bubble.fill")
+            activityCard(title: "Lugar guardado", subtitle: "Agregaste Parque Rufino Tamayo a tus favoritos.", icon: "bookmark.fill")
+            activityCard(title: "Coincidencia IA", subtitle: "La IA detectó una posible coincidencia cercana a tu zona.", icon: "sparkles")
         }
     }
 
@@ -284,22 +357,18 @@ struct ProfileView: View {
                 RoundedRectangle(cornerRadius: 14)
                     .fill(AppColors.softBeige)
                     .frame(width: 46, height: 46)
-
                 Image(systemName: icon)
                     .foregroundStyle(AppColors.primary)
                     .accessibilityHidden(true)
             }
-
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
-
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(AppColors.textSecondary)
             }
-
             Spacer()
         }
         .padding()
@@ -313,7 +382,6 @@ struct ProfileView: View {
     private var profileMenuSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("Opciones")
-
             profileOption(title: "Mis publicaciones", icon: "photo.on.rectangle")
             profileOption(title: "Mis reportes", icon: "exclamationmark.bubble.fill")
             profileOption(title: "Configuración", icon: "gearshape.fill")
@@ -328,12 +396,8 @@ struct ProfileView: View {
                 Image(systemName: icon)
                     .foregroundStyle(AppColors.primary)
                     .accessibilityHidden(true)
-
-                Text(title)
-                    .foregroundStyle(AppColors.textPrimary)
-
+                Text(title).foregroundStyle(AppColors.textPrimary)
                 Spacer()
-
                 Image(systemName: "chevron.right")
                     .foregroundStyle(AppColors.textSecondary)
                     .accessibilityHidden(true)
@@ -364,7 +428,6 @@ struct StatCard: View {
             Text(value)
                 .font(.title3.bold())
                 .foregroundStyle(AppColors.textPrimary)
-
             Text(title)
                 .font(.caption)
                 .foregroundStyle(AppColors.textSecondary)
@@ -392,25 +455,21 @@ struct EditProfileView: View {
         NavigationStack {
             ZStack {
                 AppColors.background.ignoresSafeArea()
-
                 ScrollView {
                     VStack(spacing: 16) {
                         inputField(title: "Nombre", text: $name)
                         inputField(title: "Usuario", text: $username)
                         inputField(title: "Ciudad", text: $city)
-
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Bio")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppColors.textPrimary)
-
                             TextEditor(text: $bio)
                                 .frame(height: 120)
                                 .padding(10)
                                 .background(AppColors.card)
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
-
                         Button {
                             dismiss()
                         } label: {
@@ -437,10 +496,8 @@ struct EditProfileView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancelar") {
-                        dismiss()
-                    }
-                    .foregroundStyle(AppColors.primary)
+                    Button("Cancelar") { dismiss() }
+                        .foregroundStyle(AppColors.primary)
                 }
             }
         }
@@ -451,7 +508,6 @@ struct EditProfileView: View {
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppColors.textPrimary)
-
             TextField(title, text: text)
                 .padding()
                 .background(AppColors.card)
@@ -460,78 +516,6 @@ struct EditProfileView: View {
     }
 }
 
-// MARK: - Pet Detail
-// MARK: - Pet Detail
-struct PetDetailSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let pet: Pet
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                AppColors.background.ignoresSafeArea()
-
-                VStack(spacing: 16) {
-                    Text(pet.emoji)
-                        .font(.system(size: 64))
-                        .accessibilityHidden(true)
-
-                    Text(pet.name)
-                        .font(.title2.bold())
-                        .foregroundStyle(AppColors.textPrimary)
-
-                    Text(pet.breed)
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textSecondary)
-
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Tipo")
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-                            Text(pet.type.rawValue)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppColors.primary)
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text("Edad")
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-                            Text(pet.age)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppColors.primary)
-                        }
-                    }
-
-                    Text("Perfil rápido de tu mascota para futuras funciones como historial, salud y reportes inteligentes.")
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textPrimary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Cerrar")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(AppColors.primary)
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(AppSpacing.screenPadding)
-            }
-            .navigationTitle("Detalle mascota")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
 // MARK: - Menu Detail
 struct MenuDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -541,23 +525,19 @@ struct MenuDetailSheet: View {
         NavigationStack {
             ZStack {
                 AppColors.background.ignoresSafeArea()
-
                 VStack(spacing: 16) {
                     Image(systemName: iconForTitle(title))
                         .font(.system(size: 42))
                         .foregroundStyle(AppColors.primary)
                         .accessibilityHidden(true)
-
                     Text(title)
                         .font(.title3.bold())
                         .foregroundStyle(AppColors.textPrimary)
-
                     Text(descriptionForTitle(title))
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-
                     Button {
                         dismiss()
                     } label: {
@@ -589,14 +569,10 @@ struct MenuDetailSheet: View {
 
     private func descriptionForTitle(_ title: String) -> String {
         switch title {
-        case "Mis publicaciones":
-            return "Aquí aparecerán todas las publicaciones sociales que hayas compartido."
-        case "Mis reportes":
-            return "Aquí consultarás tus reportes de mascotas perdidas o encontradas."
-        case "Configuración":
-            return "Aquí podrás personalizar notificaciones, privacidad y accesibilidad."
-        default:
-            return "Sección del perfil."
+        case "Mis publicaciones": return "Aquí aparecerán todas las publicaciones sociales que hayas compartido."
+        case "Mis reportes": return "Aquí consultarás tus reportes de mascotas perdidas o encontradas."
+        case "Configuración": return "Aquí podrás personalizar notificaciones, privacidad y accesibilidad."
+        default: return "Sección del perfil."
         }
     }
 }
@@ -610,23 +586,19 @@ struct BadgeDetailSheet: View {
         NavigationStack {
             ZStack {
                 AppColors.background.ignoresSafeArea()
-
                 VStack(spacing: 16) {
                     Image(systemName: "rosette")
                         .font(.system(size: 42))
                         .foregroundStyle(AppColors.primary)
                         .accessibilityHidden(true)
-
                     Text(badgeTitle)
                         .font(.title3.bold())
                         .foregroundStyle(AppColors.textPrimary)
-
                     Text(messageForBadge(badgeTitle))
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-
                     Button {
                         dismiss()
                     } label: {
@@ -649,14 +621,10 @@ struct BadgeDetailSheet: View {
 
     private func messageForBadge(_ title: String) -> String {
         switch title {
-        case "Rescatista":
-            return "Has participado activamente creando reportes y apoyando a la comunidad."
-        case "Explorer":
-            return "Exploraste y guardaste lugares pet friendly para tus salidas."
-        case "Comunidad":
-            return "Compartiste publicaciones e interactuaste con otros dueños de mascotas."
-        default:
-            return "Logro desbloqueado dentro de la comunidad."
+        case "Rescatista": return "Has participado activamente creando reportes y apoyando a la comunidad."
+        case "Explorer": return "Exploraste y guardaste lugares pet friendly para tus salidas."
+        case "Comunidad": return "Compartiste publicaciones e interactuaste con otros dueños de mascotas."
+        default: return "Logro desbloqueado dentro de la comunidad."
         }
     }
 }
