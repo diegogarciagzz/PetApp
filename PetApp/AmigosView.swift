@@ -75,7 +75,6 @@ struct AmigosView: View {
         }
     }
 
-    // MARK: - Solicitudes entrantes
     private var solicitudesSection: some View {
         VStack(spacing: 10) {
             if cargando && solicitudes.isEmpty {
@@ -107,7 +106,6 @@ struct AmigosView: View {
                                             .clipShape(Circle())
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Aceptar solicitud")
 
                                     Button {
                                         Task { await responder(s, aceptar: false) }
@@ -119,7 +117,6 @@ struct AmigosView: View {
                                             .clipShape(Circle())
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Rechazar solicitud")
                                 }
                             )
                         }
@@ -130,7 +127,6 @@ struct AmigosView: View {
         .padding(AppSpacing.screenPadding)
     }
 
-    // MARK: - Amigos
     private var amigosSection: some View {
         VStack(spacing: 10) {
             if cargando && amigos.isEmpty {
@@ -165,6 +161,7 @@ struct AmigosView: View {
                         .foregroundStyle(AppColors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 12)
+
                     ForEach(enviadas) { e in
                         let otro = infoMascotas[e.idMascota2]
                         amistadCard(
@@ -186,15 +183,16 @@ struct AmigosView: View {
         .padding(AppSpacing.screenPadding)
     }
 
-    // MARK: - Buscar
     private var busquedaSection: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(AppColors.textSecondary)
+
                 TextField("Buscar por nombre de mascota...", text: $busqueda)
                     .autocapitalization(.none)
                     .onSubmit { Task { await buscar() } }
+
                 if !busqueda.isEmpty {
                     Button {
                         busqueda = ""
@@ -257,7 +255,6 @@ struct AmigosView: View {
         .padding(AppSpacing.screenPadding)
     }
 
-    // MARK: - Row
     private func amistadCard(nombre: String, tipo: String?, foto: String?, trailing: () -> AnyView) -> some View {
         HStack(spacing: 12) {
             RemoteOrDataImage(urlString: foto, placeholderSystem: "pawprint.fill", cornerRadius: 24)
@@ -268,6 +265,7 @@ struct AmigosView: View {
                 Text(nombre)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
+
                 if let t = tipo {
                     Text(t)
                         .font(.caption)
@@ -283,14 +281,15 @@ struct AmigosView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    // MARK: - Actions
     private func cargar() async {
         guard let m = mascotaActual else {
             error = "Necesitas registrar una mascota para ver amigos."
             return
         }
+
         cargando = true
         error = nil
+
         do {
             async let sols = SocialService.shared.solicitudesPendientes(mascota: m)
             async let amis = SocialService.shared.amigos(mascota: m)
@@ -305,10 +304,12 @@ struct AmigosView: View {
                 amigos.flatMap { [$0.idMascota1, $0.idMascota2] } +
                 enviadas.flatMap { [$0.idMascota1, $0.idMascota2] }
             ).subtracting([m])
+
             infoMascotas = try await SocialService.shared.mascotas(ids: Array(ids))
         } catch {
             self.error = "No se pudieron cargar: \(error.localizedDescription)"
         }
+
         cargando = false
     }
 
@@ -325,6 +326,7 @@ struct AmigosView: View {
     private func buscar() async {
         cargandoBusqueda = true
         error = nil
+
         do {
             resultados = try await SocialService.shared.buscarMascotas(
                 query: busqueda,
@@ -333,6 +335,7 @@ struct AmigosView: View {
         } catch {
             self.error = "No se pudo buscar: \(error.localizedDescription)"
         }
+
         cargandoBusqueda = false
     }
 
@@ -341,6 +344,7 @@ struct AmigosView: View {
             error = "Necesitas una mascota para enviar solicitudes."
             return
         }
+
         do {
             try await SocialService.shared.enviarSolicitud(de: origen, a: mascota.id)
             mensajeInfo = "Solicitud enviada a \(mascota.nombre)."

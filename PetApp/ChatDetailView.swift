@@ -7,23 +7,32 @@
 
 
 import SwiftUI
+import Supabase
+
+struct ImagenPreviewItem: Identifiable {
+    let id = UUID()
+    let urlStr: String
+}
 
 struct ChatDetailView: View {
-    let chat: ChatPreview
-    @State private var messageText = ""
-    @State private var messages: [ChatMessage]
+    let conversacion: ConversacionPreview
+    @StateObject private var vm: ChatDetailViewModel
+    @State private var texto = ""
+    @State private var showImagePicker = false
+    @State private var imagenSeleccionada: UIImage? = nil
+    @State private var showImagePreview: ImagenPreviewItem? = nil
+    @FocusState private var inputFocused: Bool
 
-    // Sugerencias IA — esto es lo que vendes como feature de IA
-    private let aiSuggestions = [
-        "¿Dónde lo viste exactamente?",
-        "¿Tenía collar?",
-        "¿A qué hora fue?",
-        "¿Puedes mandar foto?"
-    ]
+    private let idYo: UUID
 
-    init(chat: ChatPreview) {
-        self.chat = chat
-        _messages = State(initialValue: MockData.messages[chat.name] ?? [])
+    init(conversacion: ConversacionPreview) {
+        self.conversacion = conversacion
+        let userId = SupabaseManager.shared.client.auth.currentUser?.id ?? UUID()
+        self.idYo = userId
+        _vm = StateObject(wrappedValue: ChatDetailViewModel(
+            idConversacion: conversacion.id,
+            idUsuarioActual: userId
+        ))
     }
 
     var body: some View {
@@ -31,127 +40,233 @@ struct ChatDetailView: View {
             AppColors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Mensajes
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(messages) { message in
-                                MessageBubble(message: message)
-                                    .id(message.id)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                    }
-                    .onChange(of: messages.count) { _ in
-                        if let last = messages.last {
-                            withAnimation {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-
-                // Sugerencias IA
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.primary)
-                            .accessibilityHidden(true)
-
-                        ForEach(aiSuggestions, id: \.self) { suggestion in
-                            Button {
-                                messageText = suggestion
-                            } label: {
-                                Text(suggestion)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(AppColors.primary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 7)
-                                    .background(AppColors.softBeige.opacity(0.8))
-                                    .clipShape(Capsule())
-                            }
-                            .accessibilityLabel("Sugerencia: \(suggestion)")
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                }
-                .background(AppColors.card)
-
-                // Input
-                HStack(spacing: 10) {
-                    TextField("Escribe un mensaje...", text: $messageText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(AppColors.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 22))
-                        .accessibilityLabel("Campo de mensaje")
-
-                    Button {
-                        sendMessage()
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundStyle(.white)
-                            .padding(12)
-                            .background(messageText.isEmpty ? Color.gray.opacity(0.4) : AppColors.primary)
-                            .clipShape(Circle())
-                    }
-                    .disabled(messageText.isEmpty)
-                    .accessibilityLabel("Enviar mensaje")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(AppColors.background)
+                mensajesScroll
+                inputBar
             }
         }
-        .navigationTitle(chat.name)
+        .navigationTitle(conversacion.nombreCompleto)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    AsyncImage(url: URL(string: conversacion.fotoOtro ?? "")) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                        } else {
+                            Circle().fill(AppColors.softBeige)
+                                .overlay(
+                                    Text(String(conversacion.nombreOtro.prefix(1)).uppercased())
+                                        .font(.caption.bold())
+                                        .foregroundStyle(AppColors.primary)
+                                )
+                        }
+                    }
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
+
+                    Text(conversacion.nombreCompleto)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+                }
+            }
+        }
+        .task { await vm.cargarMensajes() }
+        .refreshable { await vm.cargarMensajes() }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $imagenSeleccionada)
+        }
+        .onChange(of: imagenSeleccionada) { _, img in
+            guard let img else { return }
+            Task { await vm.enviarImagen(img) }
+        }
+        .sheet(item: $showImagePreview) { item in
+            ImagenFullscreenView(urlStr: item.urlStr)
+        }
     }
 
-    private func sendMessage() {
-        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let newMessage = ChatMessage(
-            text: messageText,
-            isFromMe: true,
-            time: "Ahora"
-        )
-        messages.append(newMessage)
-        messageText = ""
+    // MARK: - Lista mensajes
+    private var mensajesScroll: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if vm.isLoading {
+                    ProgressView().padding(.top, 40)
+                } else {
+                    LazyVStack(spacing: 8) {
+                        ForEach(vm.mensajes) { mensaje in
+                            MensajeBubbleView(
+                                mensaje: mensaje,
+                                esPropio: mensaje.idUsuarioEmisor == idYo,
+                                onTapImagen: { url in showImagePreview = ImagenPreviewItem(urlStr: url) }
+                            )
+                            .id(mensaje.id)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                }
+            }
+            .onChange(of: vm.mensajes.count) { _, _ in
+                if let last = vm.mensajes.last {
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+            .onAppear {
+                if let last = vm.mensajes.last {
+                    proxy.scrollTo(last.id, anchor: .bottom)
+                }
+            }
+        }
     }
-}
 
-struct MessageBubble: View {
-    let message: ChatMessage
+    // MARK: - Input
+    private var inputBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 10) {
+                // Botón imagen
+                Button {
+                    showImagePicker = true
+                } label: {
+                    Image(systemName: "photo")
+                        .font(.title3)
+                        .foregroundStyle(AppColors.primary)
+                        .padding(10)
+                        .background(AppColors.card)
+                        .clipShape(Circle())
+                }
+                .disabled(vm.isSending)
 
-    var body: some View {
-        HStack {
-            if message.isFromMe { Spacer(minLength: 60) }
-
-            VStack(alignment: message.isFromMe ? .trailing : .leading, spacing: 4) {
-                Text(message.text)
-                    .font(.subheadline)
-                    .foregroundStyle(message.isFromMe ? .white : AppColors.textPrimary)
+                // TextField multilinea
+                TextField("Mensaje...", text: $texto, axis: .vertical)
+                    .lineLimit(1...4)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(message.isFromMe ? AppColors.primary : AppColors.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .background(AppColors.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .focused($inputFocused)
 
-                Text(message.time)
-                    .font(.caption2)
-                    .foregroundStyle(AppColors.textSecondary)
+                // Botón enviar
+                Button {
+                    let t = texto.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !t.isEmpty else { return }
+                    texto = ""
+                    inputFocused = false
+                    Task { await vm.enviarTexto(t) }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                  ? AppColors.softBeige : AppColors.primary)
+                            .frame(width: 40, height: 40)
+                        if vm.isSending {
+                            ProgressView().tint(.white).scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(
+                                    texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    ? AppColors.textSecondary : .white
+                                )
+                        }
+                    }
+                }
+                .disabled(texto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.isSending)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(message.isFromMe ? "Tú" : "Contacto"): \(message.text), \(message.time)")
-
-            if !message.isFromMe { Spacer(minLength: 60) }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppColors.background)
         }
     }
 }
 
-#Preview {
-    NavigationStack {
-        ChatDetailView(chat: MockData.chats[0])
+// MARK: - Burbuja de mensaje
+struct MensajeBubbleView: View {
+    let mensaje: Mensaje
+    let esPropio: Bool
+    let onTapImagen: (String) -> Void
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            if esPropio { Spacer(minLength: 60) }
+
+            VStack(alignment: esPropio ? .trailing : .leading, spacing: 4) {
+                // Imagen adjunta
+                if let imgUrl = mensaje.imagenUrl, let url = URL(string: imgUrl) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                                .frame(width: 200, height: 160)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .onTapGesture { onTapImagen(imgUrl) }
+                        } else {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(AppColors.softBeige)
+                                .frame(width: 200, height: 160)
+                                .overlay(ProgressView())
+                        }
+                    }
+                }
+
+                // Texto
+                if let contenido = mensaje.contenido, !contenido.isEmpty {
+                    Text(contenido)
+                        .font(.subheadline)
+                        .foregroundStyle(esPropio ? .white : AppColors.textPrimary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(esPropio ? AppColors.primary : AppColors.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                }
+
+                // Hora + seen
+                HStack(spacing: 4) {
+                    Text(mensaje.fechaEnvio.formatted(date: .omitted, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(AppColors.textSecondary)
+
+                    if esPropio {
+                        Image(systemName: mensaje.leido ? "checkmark.circle.fill" : "checkmark.circle")
+                            .font(.caption2)
+                            .foregroundStyle(mensaje.leido ? AppColors.primary : AppColors.textSecondary)
+                    }
+                }
+            }
+
+            if !esPropio { Spacer(minLength: 60) }
+        }
     }
 }
+
+// MARK: - Imagen fullscreen
+struct ImagenFullscreenView: View {
+    let urlStr: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            if let url = URL(string: urlStr) {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase {
+                        img.resizable().scaledToFit()
+                    } else {
+                        ProgressView().tint(.white)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(.white)
+                    .padding()
+            }
+        }
+    }
+}
+
+

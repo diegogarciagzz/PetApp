@@ -35,9 +35,11 @@ struct HomeView: View {
                             ContentUnavailableView(
                                 selectedTab == 0 ? "Sin publicaciones" : "Sin amigos aún",
                                 systemImage: selectedTab == 0 ? "pawprint.fill" : "person.2.fill",
-                                description: Text(selectedTab == 0
+                                description: Text(
+                                    selectedTab == 0
                                     ? "Aún no hay publicaciones."
-                                    : "Tus amigos no han publicado nada todavía.")
+                                    : "Tus amigos no han publicado nada todavía."
+                                )
                             )
                         } else {
                             LazyVStack(spacing: 16) {
@@ -59,10 +61,14 @@ struct HomeView: View {
             }
             .navigationBarHidden(true)
             .task {
-                if !UserSession.shared.isLoaded { await UserSession.shared.refresh() }
+                if !UserSession.shared.isLoaded {
+                    await UserSession.shared.refresh()
+                }
                 await vm.cargarFeed()
             }
-            .refreshable { await vm.cargarFeed() }
+            .refreshable {
+                await vm.cargarFeed()
+            }
             .sheet(item: $postConComentarios) { post in
                 ComentariosView(post: post) {
                     vm.incrementarContadorComentarios(post)
@@ -82,13 +88,14 @@ struct HomeView: View {
                 Text("Hola 👋")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
+
                 Text("Descubre mascotas")
                     .font(.title2.bold())
                     .foregroundStyle(AppColors.textPrimary)
             }
+
             Spacer()
 
-            // Botón amigos / solicitudes
             Button {
                 mostrarAmigos = true
             } label: {
@@ -101,7 +108,6 @@ struct HomeView: View {
             }
             .accessibilityLabel("Amigos")
 
-            // Botón nueva publicación
             Button {
                 vm.mostrarNuevaPublicacion = true
             } label: {
@@ -150,8 +156,6 @@ struct PostCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-
-            // Header
             HStack(spacing: 12) {
                 RemoteOrDataImage(
                     urlString: post.fotoMascota,
@@ -166,6 +170,7 @@ struct PostCardView: View {
                     Text(post.nombreMascota)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
+
                     if let raza = post.raza {
                         Text(raza)
                             .font(.caption)
@@ -180,14 +185,12 @@ struct PostCardView: View {
                     .foregroundStyle(AppColors.textSecondary)
             }
 
-            // Título
             if let titulo = post.titulo {
                 Text(titulo)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
             }
 
-            // Imagen
             if let imagen = post.imagen, !imagen.isEmpty {
                 RemoteOrDataImage(
                     urlString: imagen,
@@ -197,14 +200,12 @@ struct PostCardView: View {
                 )
             }
 
-            // Texto
             if let texto = post.texto {
                 Text(texto)
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textPrimary)
             }
 
-            // Footer (acciones)
             HStack(spacing: 18) {
                 Button(action: onLike) {
                     HStack(spacing: 6) {
@@ -212,6 +213,7 @@ struct PostCardView: View {
                             .foregroundStyle(isLiked ? .red : AppColors.textSecondary)
                             .scaleEffect(isLiked ? 1.1 : 1.0)
                             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isLiked)
+
                         Text("\(totalLikes)")
                             .foregroundStyle(AppColors.textPrimary)
                     }
@@ -223,6 +225,7 @@ struct PostCardView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "bubble.left")
                             .foregroundStyle(AppColors.primary)
+
                         Text("\(totalComentarios)")
                             .foregroundStyle(AppColors.textPrimary)
                     }
@@ -239,7 +242,6 @@ struct PostCardView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .font(.caption.weight(.medium))
         }
         .padding(14)
         .background(AppColors.card)

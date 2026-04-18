@@ -27,7 +27,6 @@ struct ComentariosView: View {
                 AppColors.background.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Resumen del post
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 10) {
                             RemoteOrDataImage(
@@ -41,13 +40,16 @@ struct ComentariosView: View {
                             Text(post.nombreMascota)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppColors.textPrimary)
+
                             Spacer()
                         }
+
                         if let t = post.titulo, !t.isEmpty {
                             Text(t)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AppColors.textPrimary)
                         }
+
                         if let tx = post.texto, !tx.isEmpty {
                             Text(tx)
                                 .font(.caption)
@@ -61,7 +63,6 @@ struct ComentariosView: View {
                     .padding(.horizontal, AppSpacing.screenPadding)
                     .padding(.top, 8)
 
-                    // Lista de comentarios
                     if cargando && comentarios.isEmpty {
                         Spacer()
                         ProgressView()
@@ -93,7 +94,6 @@ struct ComentariosView: View {
                             .padding(.horizontal, AppSpacing.screenPadding)
                     }
 
-                    // Input
                     HStack(spacing: 10) {
                         TextField("Escribe un comentario...", text: $texto, axis: .vertical)
                             .lineLimit(1...4)
@@ -152,14 +152,17 @@ struct ComentariosView: View {
                     Text(c.nombreMascota ?? "Mascota")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
+
                     Text(c.fechaComentario.formatted(.relative(presentation: .named)))
                         .font(.caption2)
                         .foregroundStyle(AppColors.textSecondary)
                 }
+
                 Text(c.texto)
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textPrimary)
             }
+
             Spacer()
         }
         .padding(10)
@@ -170,11 +173,13 @@ struct ComentariosView: View {
     private func cargar() async {
         cargando = true
         error = nil
+
         do {
             comentarios = try await SocialService.shared.comentarios(publicacion: post.id)
         } catch {
             self.error = "No se pudieron cargar los comentarios."
         }
+
         cargando = false
     }
 
@@ -183,9 +188,11 @@ struct ComentariosView: View {
             error = "Necesitas una mascota para comentar."
             return
         }
+
         let contenido = texto.trimmingCharacters(in: .whitespacesAndNewlines)
         enviando = true
         error = nil
+
         do {
             try await SocialService.shared.publicarComentario(
                 publicacion: post.id,
@@ -198,6 +205,7 @@ struct ComentariosView: View {
         } catch {
             self.error = "No se pudo publicar: \(error.localizedDescription)"
         }
+
         enviando = false
     }
 }
