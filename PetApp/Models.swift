@@ -90,13 +90,34 @@ struct UserProfile {
     let reportsCount: Int
 }
 
+// MARK: - Pet con init normal e init para edición
 struct Pet: Identifiable {
-    let id = UUID()
+    let id: UUID
     let name: String
     let breed: String
     let age: String
     let type: PetType
     let emoji: String
+
+    // Init normal (para MockData y nuevas mascotas)
+    init(name: String, breed: String, age: String, type: PetType, emoji: String) {
+        self.id = UUID()
+        self.name = name
+        self.breed = breed
+        self.age = age
+        self.type = type
+        self.emoji = emoji
+    }
+
+    // Init con id override (para editar conservando el mismo id)
+    init(id: UUID, name: String, breed: String, age: String, type: PetType, emoji: String) {
+        self.id = id
+        self.name = name
+        self.breed = breed
+        self.age = age
+        self.type = type
+        self.emoji = emoji
+    }
 }
 
 enum PetType: String, CaseIterable, Identifiable, Hashable {

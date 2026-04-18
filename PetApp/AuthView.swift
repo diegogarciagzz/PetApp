@@ -1,30 +1,192 @@
+
+
 //
 //  AuthView.swift
 //  PetApp
 //
-//  REEMPLAZA el AuthView.swift original.
-//  Cambios vs original:
-//    - Usa @State var viewModel = AuthViewModel() en lugar de @State isLoggedIn
-//    - handleLogin() y handleRegister() llaman a AuthViewModel (Supabase real)
-//    - El botón Demo sigue funcionando igual
-//    - Todos los @Binding isLoggedIn → reemplazados por el ViewModel
+//
+//  AuthView.swift
+//  PetApp
 //
 
 import SwiftUI
 
+// MARK: - AuthView (raíz de autenticación)
 struct AuthView: View {
     @State private var showLogin = true
     @State private var viewModel = AuthViewModel()
 
     var body: some View {
         if viewModel.isLoggedIn {
-            MainTabView()
+            if viewModel.isNewUser {
+                FirstPetOnboardingView(viewModel: viewModel)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal: .move(edge: .leading)
+                    ))
+            } else {
+                MainTabView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing),
+                        removal: .move(edge: .leading)
+                    ))
+            }
         } else {
             if showLogin {
                 LoginView(viewModel: viewModel, showLogin: $showLogin)
             } else {
                 RegisterView(viewModel: viewModel, showLogin: $showLogin)
             }
+        }
+    }
+}
+
+// MARK: - FirstPetOnboardingView
+struct FirstPetOnboardingView: View {
+    @Bindable var viewModel: AuthViewModel
+    @State private var showAddPet = false
+    @State private var addedPet: Pet? = nil
+
+    var body: some View {
+        ZStack {
+            AppColors.background.ignoresSafeArea()
+
+            // Fondo decorativo
+            VStack {
+                Circle()
+                    .fill(AppColors.primary.opacity(0.07))
+                    .frame(width: 380, height: 380)
+                    .offset(x: 140, y: -130)
+                Spacer()
+                Circle()
+                    .fill(AppColors.softBeige.opacity(0.5))
+                    .frame(width: 260, height: 260)
+                    .offset(x: -110, y: 90)
+            }
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                // Emoji central
+                ZStack {
+                    Circle()
+                        .fill(AppColors.softBeige)
+                        .frame(width: 130, height: 130)
+
+                    Text(addedPet?.emoji ?? "🐾")
+                        .font(.system(size: 64))
+                        .accessibilityHidden(true)
+                }
+                .animation(.spring(response: 0.45, dampingFraction: 0.6), value: addedPet?.emoji)
+                .padding(.bottom, 36)
+
+                // Texto principal
+                Group {
+                    if let pet = addedPet {
+                        VStack(spacing: 10) {
+                            Text("¡\(pet.name) está listo! 🎉")
+                                .font(.title2.bold())
+                                .foregroundStyle(AppColors.textPrimary)
+                                .multilineTextAlignment(.center)
+
+                            Text("Tu primera mascota fue registrada.\nPuedes agregar más desde tu perfil.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    } else {
+                        VStack(spacing: 10) {
+                            Text("¡Bienvenido a PetApp!")
+                                .font(.title2.bold())
+                                .foregroundStyle(AppColors.textPrimary)
+                                .multilineTextAlignment(.center)
+
+                            Text("Registra a tu primera mascota para\npersonalizar tu experiencia.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.3), value: addedPet?.name)
+                .padding(.horizontal, 32)
+
+                Spacer()
+
+                // Botones
+                VStack(spacing: 14) {
+                    if addedPet == nil {
+                        // Botón principal: agregar mascota
+                        Button {
+                            showAddPet = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.body)
+                                    .accessibilityHidden(true)
+                                Text("Agregar mi primera mascota")
+                                    .font(.headline)
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(AppColors.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Agregar primera mascota")
+
+                        // Botón secundario: omitir
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                viewModel.isNewUser = false
+                            }
+                        } label: {
+                            Text("Omitir por ahora")
+                                .font(.subheadline)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Omitir registro de mascota")
+
+                    } else {
+                        // Botón de continuar (tras agregar mascota)
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                viewModel.isNewUser = false
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.body)
+                                    .accessibilityHidden(true)
+                                Text("Entrar a PetApp")
+                                    .font(.headline)
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(AppColors.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Entrar a la aplicación")
+                    }
+                }
+                .padding(.horizontal, AppSpacing.screenPadding)
+                .padding(.bottom, 50)
+            }
+        }
+        .sheet(isPresented: $showAddPet) {
+            AddEditPetView(existingPet: nil) { newPet in
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
+                    addedPet = newPet
+                }
+            }
+            .presentationDetents([.medium, .large])
         }
     }
 }
@@ -87,20 +249,16 @@ struct LoginView: View {
                         authField(icon: "lock", placeholder: "Contraseña",
                                   text: $password, isSecure: true)
 
-                        // Error
                         if let error = viewModel.errorMessage {
                             HStack(spacing: 6) {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .foregroundStyle(.red)
                                     .accessibilityHidden(true)
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
+                                Text(error).font(.caption).foregroundStyle(.red)
                             }
                             .transition(.opacity)
                         }
 
-                        // Botón login
                         Button {
                             Task { await viewModel.login(email: email, password: password) }
                         } label: {
@@ -121,7 +279,7 @@ struct LoginView: View {
                         .disabled(viewModel.isLoading)
                         .padding(.top, 8)
 
-                        Button { /* TODO: recuperar contraseña */ } label: {
+                        Button { } label: {
                             Text("¿Olvidaste tu contraseña?")
                                 .font(.subheadline)
                                 .foregroundStyle(AppColors.primary)
@@ -176,11 +334,8 @@ struct LoginView: View {
     }
 
     private func authField(
-        icon: String,
-        placeholder: String,
-        text: Binding<String>,
-        keyboard: UIKeyboardType = .default,
-        isSecure: Bool = false
+        icon: String, placeholder: String, text: Binding<String>,
+        keyboard: UIKeyboardType = .default, isSecure: Bool = false
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
@@ -221,7 +376,6 @@ struct RegisterView: View {
             ScrollView {
                 VStack(spacing: 0) {
 
-                    // Header
                     HStack {
                         Button {
                             withAnimation(.easeInOut) { showLogin = true }
@@ -246,15 +400,13 @@ struct RegisterView: View {
                     }
                     .padding(.vertical, 32)
 
-                    // Formulario
                     VStack(spacing: 14) {
-                        registerField(icon: "person",       placeholder: "Nombre",              text: $nombre)
-                        registerField(icon: "person",       placeholder: "Apellidos",           text: $apellidos)
-                        registerField(icon: "envelope",     placeholder: "Correo electrónico",  text: $email, keyboard: .emailAddress)
-                        registerField(icon: "lock",         placeholder: "Contraseña",          text: $password, isSecure: true)
-                        registerField(icon: "lock.shield",  placeholder: "Confirmar contraseña",text: $confirmPassword, isSecure: true)
+                        registerField(icon: "person",       placeholder: "Nombre",               text: $nombre)
+                        registerField(icon: "person",       placeholder: "Apellidos",            text: $apellidos)
+                        registerField(icon: "envelope",     placeholder: "Correo electrónico",   text: $email, keyboard: .emailAddress)
+                        registerField(icon: "lock",         placeholder: "Contraseña",           text: $password, isSecure: true)
+                        registerField(icon: "lock.shield",  placeholder: "Confirmar contraseña", text: $confirmPassword, isSecure: true)
 
-                        // Error
                         if let error = viewModel.errorMessage {
                             HStack(spacing: 6) {
                                 Image(systemName: "exclamationmark.circle.fill")
@@ -265,7 +417,6 @@ struct RegisterView: View {
                             .transition(.opacity)
                         }
 
-                        // Botón registrar
                         Button {
                             Task {
                                 await viewModel.register(
@@ -296,7 +447,6 @@ struct RegisterView: View {
                     }
                     .padding(.horizontal, AppSpacing.screenPadding)
 
-                    // Ir a login
                     HStack(spacing: 4) {
                         Text("¿Ya tienes cuenta?").foregroundStyle(AppColors.textSecondary)
                         Button {
@@ -316,11 +466,8 @@ struct RegisterView: View {
     }
 
     private func registerField(
-        icon: String,
-        placeholder: String,
-        text: Binding<String>,
-        keyboard: UIKeyboardType = .default,
-        isSecure: Bool = false
+        icon: String, placeholder: String, text: Binding<String>,
+        keyboard: UIKeyboardType = .default, isSecure: Bool = false
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
