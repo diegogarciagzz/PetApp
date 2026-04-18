@@ -65,12 +65,25 @@ struct HomeView: View {
                     .foregroundStyle(AppColors.textPrimary)
             }
             Spacer()
+
+            // Botón nueva publicación
+            Button {
+                vm.mostrarNuevaPublicacion = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(AppColors.primary)
+            }
+
             Image(systemName: "bell")
                 .font(.title3)
                 .foregroundStyle(AppColors.textPrimary)
                 .padding(10)
                 .background(AppColors.card)
                 .clipShape(Circle())
+        }
+        .sheet(isPresented: $vm.mostrarNuevaPublicacion) {
+            NuevaPublicacionView()
         }
     }
 
