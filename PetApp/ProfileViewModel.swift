@@ -2,8 +2,6 @@
 //  ProfileViewModel.swift
 //  PetApp
 //
-//  Created by Alumno on 18/04/26.
-//
 
 import SwiftUI
 import Combine
@@ -12,21 +10,44 @@ import Supabase
 @MainActor
 class ProfileViewModel: ObservableObject {
     @Published var fotoPerfilURL: String? = nil
-    @Published var isUploadingAvatar = false
+    @Published var isUploadingAvatar      = false
     @Published var idMascotaActiva: UUID? = nil
+    @Published var nombre: String         = ""
 
     func cargarPerfil() async {
         guard let userId = SupabaseManager.shared.client.auth.currentUser?.id.uuidString else { return }
-        let data: [UsuarioPerfil] = try! await SupabaseManager.shared.client
-            .from("usuario")
-            .select("foto_perfil")
-            .eq("id_usuario", value: userId)
-            .limit(1)
-            .execute()
-            .value
-        fotoPerfilURL = data.first?.fotoPerfil
+
+        struct PerfilRow: Decodable {
+            let fotoPerfil: String?
+            let nombre: String?
+            let apellidos: String?
+            enum CodingKeys: String, CodingKey {
+                case fotoPerfil = "foto_perfil"
+                case nombre     = "nombre"
+                case apellidos  = "apellidos"
+            }
+        }
+
+        do {
+            let rows: [PerfilRow] = try await SupabaseManager.shared.client
+                .from("usuario")
+                .select("foto_perfil, nombre, apellidos")
+                .eq("id_usuario", value: userId)
+                .limit(1)
+                .execute()
+                .value
+
+            if let row = rows.first {
+                fotoPerfilURL = row.fotoPerfil
+                nombre = "\(row.nombre ?? "") \(row.apellidos ?? "")".trimmingCharacters(in: .whitespaces)
+            }
+        } catch {
+            print("❌ Error cargando perfil: \(error)")
+        }
+
         await cargarMascotaActiva()
     }
+
     private func cargarMascotaActiva() async {
         guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
         struct Row: Decodable {
@@ -61,7 +82,7 @@ class ProfileViewModel: ObservableObject {
                 .execute()
             fotoPerfilURL = url
         } catch {
-            print("Error subiendo avatar: \(error)")
+            print("❌ Error subiendo avatar: \(error)")
         }
     }
 }
