@@ -44,35 +44,79 @@ enum MockData {
             category: "Parque",
             address: "San Pedro Garza García",
             latitude: 25.6516,
-            longitude: -100.3567
+            longitude: -100.3567,
+            rating: 4.8,
+            reviewCount: 127,
+            photos: ["park1", "park2", "park3"],
+            comments: [
+                PlaceComment(userName: "Sofía", userAvatar: "avatar1", text: "¡Perfecto para perros grandes! Mucha sombra.", stars: 5, date: "Ayer"),
+                PlaceComment(userName: "Carlos", userAvatar: "avatar2", text: "Gatos ok pero con correa. Limpio.", stars: 4, date: "2 días"),
+                PlaceComment(userName: "Vale", userAvatar: "avatar3", text: "Tortugas y conejos felices aquí.", stars: 5, date: "1 semana")
+            ],
+            petTypes: [.dog, .cat, .turtle, .rabbit],
+            isPetFriendly: true
         ),
         PetPlace(
             name: "Paseo Santa Lucía",
             category: "Paseo",
             address: "Centro de Monterrey",
             latitude: 25.6747,
-            longitude: -100.3090
+            longitude: -100.3090,
+            rating: 4.6,
+            reviewCount: 89,
+            photos: ["paseo1", "paseo2"],
+            comments: [
+                PlaceComment(userName: "Andrea", userAvatar: "avatar4", text: "Ideal para paseos con hámsters en mochila.", stars: 5, date: "Hoy"),
+                PlaceComment(userName: "Luis", userAvatar: "avatar5", text: "Aves en jaula permitidas.", stars: 4, date: "3 días")
+            ],
+            petTypes: [.dog, .hamster, .bird],
+            isPetFriendly: true
         ),
         PetPlace(
             name: "Parque Tolteca",
             category: "Parque",
             address: "Guadalupe",
             latitude: 25.6762,
-            longitude: -100.2443
+            longitude: -100.2443,
+            rating: 4.3,
+            reviewCount: 56,
+            photos: ["tolteca1"],
+            comments: [
+                PlaceComment(userName: "Marta", userAvatar: "avatar6", text: "Buen espacio para todos los tipos.", stars: 4, date: "Ayer")
+            ],
+            petTypes: [.dog, .cat, .rabbit, .other],
+            isPetFriendly: true
         ),
         PetPlace(
             name: "Warehouse 42",
             category: "Café",
             address: "Barrio Antiguo",
             latitude: 25.6681,
-            longitude: -100.3097
+            longitude: -100.3097,
+            rating: 4.7,
+            reviewCount: 203,
+            photos: ["cafe1", "cafe2", "cafe3", "cafe4"],
+            comments: [
+                PlaceComment(userName: "Sofía", userAvatar: "avatar1", text: "Perros pequeños ok, gatos con transportadora.", stars: 5, date: "Hoy"),
+                PlaceComment(userName: "Carlos", userAvatar: "avatar2", text: "¡Mi tortuga fue bienvenida!", stars: 5, date: "2 días")
+            ],
+            petTypes: [.dog, .cat, .turtle],
+            isPetFriendly: true
         ),
         PetPlace(
             name: "Mor House",
             category: "Café",
             address: "Del Valle, San Pedro",
             latitude: 25.6503,
-            longitude: -100.3398
+            longitude: -100.3398,
+            rating: 4.5,
+            reviewCount: 98,
+            photos: ["morhouse1", "morhouse2"],
+            comments: [
+                PlaceComment(userName: "Vale", userAvatar: "avatar3", text: "Conejos y hámsters bienvenidos.", stars: 4, date: "1 semana")
+            ],
+            petTypes: [.rabbit, .hamster, .bird],
+            isPetFriendly: true
         )
     ]
 
