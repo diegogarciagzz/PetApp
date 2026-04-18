@@ -69,16 +69,22 @@ class ProfileViewModel: ObservableObject {
     }
 
     func actualizarAvatar(image: UIImage) async {
-        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id.uuidString,
-              let data = image.jpegData(compressionQuality: 0.8) else { return }
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
         isUploadingAvatar = true
         defer { isUploadingAvatar = false }
         do {
-            let url = try await StorageManager.shared.subirAvatar(userId: userId, imageData: data)
+            let url = try await StorageManager.shared.subirImagen(
+                image,
+                bucket: StorageManager.Bucket.perfiles,
+                carpeta: userId.uuidString
+            )
+            struct AvatarUpdate: Encodable {
+                let foto_perfil: String
+            }
             try await SupabaseManager.shared.client
                 .from("usuario")
-                .update(["foto_perfil": url])
-                .eq("id_usuario", value: userId)
+                .update(AvatarUpdate(foto_perfil: url))
+                .eq("id_usuario", value: userId.uuidString)
                 .execute()
             fotoPerfilURL = url
         } catch {
