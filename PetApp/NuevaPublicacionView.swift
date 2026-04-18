@@ -2,8 +2,6 @@
 //  NuevaPublicacionView.swift
 //  PetApp
 //
-//  Created by Alumno on 18/04/26.
-//
 
 import SwiftUI
 import PhotosUI
@@ -20,7 +18,7 @@ struct NuevaPublicacionView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
 
-                        // Selector de foto
+                        // MARK: Selector de foto
                         PhotosPicker(selection: $vm.imagenSeleccionada,
                                      matching: .images) {
                             ZStack {
@@ -39,9 +37,42 @@ struct NuevaPublicacionView: View {
                                         Image(systemName: "camera.fill")
                                             .font(.system(size: 36))
                                             .foregroundStyle(AppColors.primary)
-                                        Text("Agregar foto")
+                                        Text("Agregar foto de tu mascota")
                                             .font(.subheadline)
                                             .foregroundStyle(AppColors.textSecondary)
+                                    }
+                                }
+
+                                // Spinner durante validación IA
+                                if vm.isValidatingImage {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(.black.opacity(0.45))
+                                        .frame(height: 220)
+                                    VStack(spacing: 10) {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(1.2)
+                                        Text("Verificando mascota con IA...")
+                                            .font(.caption.weight(.medium))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+
+                                // Badge de validación exitosa
+                                if vm.imageValidated && !vm.isValidatingImage {
+                                    VStack {
+                                        HStack {
+                                            Spacer()
+                                            Label("Mascota detectada", systemImage: "checkmark.seal.fill")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.white)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 6)
+                                                .background(Color.green.opacity(0.85))
+                                                .clipShape(Capsule())
+                                                .padding(10)
+                                        }
+                                        Spacer()
                                     }
                                 }
                             }
@@ -50,7 +81,21 @@ struct NuevaPublicacionView: View {
                             Task { await vm.cargarImagen(nuevo) }
                         }
 
-                        // Título
+                        // MARK: Error de validación
+                        if let error = vm.errorMessage {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                            .padding(12)
+                            .background(Color.orange.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+
+                        // MARK: Título
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Título")
                                 .font(.caption.weight(.semibold))
@@ -59,9 +104,43 @@ struct NuevaPublicacionView: View {
                                 .padding(12)
                                 .background(AppColors.card)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                            // Sugerencias de título
+                            if !vm.titleSuggestions.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "sparkles")
+                                            .font(.caption)
+                                            .foregroundStyle(AppColors.primary)
+                                        Text("Sugerencias IA")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(AppColors.primary)
+                                    }
+
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 8) {
+                                            ForEach(vm.titleSuggestions, id: \.self) { suggestion in
+                                                Button {
+                                                    vm.titulo = suggestion
+                                                } label: {
+                                                    Text(suggestion)
+                                                        .font(.caption)
+                                                        .lineLimit(1)
+                                                        .foregroundStyle(AppColors.textPrimary)
+                                                        .padding(.horizontal, 12)
+                                                        .padding(.vertical, 8)
+                                                        .background(AppColors.softBeige)
+                                                        .clipShape(Capsule())
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        // Texto
+                        // MARK: Descripción
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Descripción")
                                 .font(.caption.weight(.semibold))
@@ -73,23 +152,52 @@ struct NuevaPublicacionView: View {
                                 .padding(12)
                                 .background(AppColors.card)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                            // Sugerencias de descripción
+                            if !vm.descriptionSuggestions.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "sparkles")
+                                            .font(.caption)
+                                            .foregroundStyle(AppColors.primary)
+                                        Text("Sugerencias IA")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(AppColors.primary)
+                                    }
+
+                                    VStack(spacing: 6) {
+                                        ForEach(vm.descriptionSuggestions, id: \.self) { suggestion in
+                                            Button {
+                                                vm.texto = suggestion
+                                            } label: {
+                                                HStack {
+                                                    Text(suggestion)
+                                                        .font(.caption)
+                                                        .foregroundStyle(AppColors.textPrimary)
+                                                        .multilineTextAlignment(.leading)
+                                                    Spacer()
+                                                    Image(systemName: "plus.circle")
+                                                        .font(.caption)
+                                                        .foregroundStyle(AppColors.primary)
+                                                }
+                                                .padding(10)
+                                                .background(AppColors.softBeige.opacity(0.6))
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        // Error
-                        if let error = vm.errorMessage {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-
-                        // Botón publicar
+                        // MARK: Botón publicar
                         Button {
                             Task { await vm.publicar() }
                         } label: {
                             HStack {
                                 if vm.isLoading {
-                                    ProgressView()
-                                        .tint(.white)
+                                    ProgressView().tint(.white)
                                 } else {
                                     Text("Publicar")
                                         .font(.subheadline.weight(.semibold))

@@ -2,8 +2,6 @@
 //  NuevaPublicacionViewModel.swift
 //  PetApp
 //
-//  Created by Alumno on 18/04/26.
-//
 
 import Foundation
 import PhotosUI
@@ -21,23 +19,64 @@ class NuevaPublicacionViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var publicacionExitosa = false
 
-    /// id de la mascota activa del usuario autenticado.
+    // AI: validación de imagen
+    @Published var isValidatingImage = false
+    @Published var imageValidated = false   // true cuando pasó la validación
+
+    // AI: sugerencias de caption / descripción
+    @Published var titleSuggestions: [String] = []
+    @Published var descriptionSuggestions: [String] = []
+
     var idMascotaActual: UUID? { UserSession.shared.activePetId }
 
     private let client = SupabaseManager.shared.client
 
     var puedePublicar: Bool {
-        (!texto.trimmingCharacters(in: .whitespaces).isEmpty || imagenPreview != nil)
+        guard !isValidatingImage else { return false }
+        // Si hay imagen, debe haber pasado la validación
+        if imagenPreview != nil && !imageValidated { return false }
+        return (!texto.trimmingCharacters(in: .whitespaces).isEmpty || imagenPreview != nil)
             && idMascotaActual != nil
     }
 
+    // MARK: - Carga y validación de imagen
+
     func cargarImagen(_ item: PhotosPickerItem?) async {
         guard let item else { return }
-        if let data = try? await item.loadTransferable(type: Data.self),
-           let uiImage = UIImage(data: data) {
-            imagenPreview = uiImage
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let uiImage = UIImage(data: data) else { return }
+
+        imagenPreview = uiImage
+        imageValidated = false
+        isValidatingImage = true
+        errorMessage = nil
+
+        let esMascota = await PetImageValidator.containsPet(uiImage)
+        isValidatingImage = false
+
+        if esMascota {
+            imageValidated = true
+            errorMessage = nil
+            refreshSuggestions()
+        } else {
+            imagenPreview = nil
+            imagenSeleccionada = nil
+            imageValidated = false
+            errorMessage = "Solo se permiten fotos de mascotas 🐾 Asegúrate de que la imagen muestre a tu mascota claramente."
         }
     }
+
+    // MARK: - Sugerencias AI
+
+    func refreshSuggestions() {
+        let mascota = UserSession.shared.myPets.first(where: { $0.id == idMascotaActual })
+        let nombre = mascota?.nombre ?? ""
+        let tipo = mascota?.tipoAnimal ?? ""
+        titleSuggestions = PostCaptionAI.titleSuggestions(petName: nombre, petType: tipo)
+        descriptionSuggestions = PostCaptionAI.descriptionSuggestions(petName: nombre, petType: tipo)
+    }
+
+    // MARK: - Publicar
 
     func publicar() async {
         guard let mascota = idMascotaActual else {
@@ -50,7 +89,6 @@ class NuevaPublicacionViewModel: ObservableObject {
         do {
             var urlImagen: String? = nil
 
-            // 1. Subir foto si hay una seleccionada
             if let imagen = imagenPreview {
                 urlImagen = try await StorageManager.shared.subirImagen(
                     imagen,
@@ -59,7 +97,6 @@ class NuevaPublicacionViewModel: ObservableObject {
                 )
             }
 
-            // 2. Insertar publicación en la DB
             let nuevaPublicacion = NuevaPublicacionPayload(
                 idMascota: mascota,
                 titulo: titulo.isEmpty ? nil : titulo,
@@ -83,7 +120,7 @@ class NuevaPublicacionViewModel: ObservableObject {
     }
 }
 
-// Payload para el INSERT
+// MARK: - Payload para el INSERT
 struct NuevaPublicacionPayload: Encodable {
     let idMascota: UUID
     let titulo: String?
