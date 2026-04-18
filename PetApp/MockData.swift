@@ -1,11 +1,10 @@
+
 //
 //  MockData.swift
 //  PetApp
 //
 //  Created by Alumno on 18/04/26.
 //
-
-
 import Foundation
 
 enum MockData {
@@ -23,7 +22,7 @@ enum MockData {
             userName: "Carlos Gómez",
             userHandle: "@carlospets",
             imageName: "cat1",
-            caption: "Michi dormilón después de jugar toda la tarde.",
+            caption: "Michi dormilón después de jugar toda la tarde 🐱",
             likes: 94,
             comments: 8,
             isFriendPost: false
@@ -32,7 +31,7 @@ enum MockData {
             userName: "Valentina Cruz",
             userHandle: "@valeandpets",
             imageName: "dog2",
-            caption: "Primera visita al parque pet friendly del finde ✨",
+            caption: "Primera visita al parque pet friendly del finde con mi tortuga 🐢✨",
             likes: 201,
             comments: 25,
             isFriendPost: true
@@ -107,8 +106,19 @@ enum MockData {
             details: "Lomito grande, muy amigable.",
             matchScore: 64,
             status: "Perdido"
+        ),
+        PetReport(
+            petName: "Pipo",
+            type: "Hámster",
+            color: "Dorado",
+            location: "Cumbres Elite",
+            hoursAgo: 2,
+            details: "Hámster dorado con rabadilla blanca, escapó de su jaula.",
+            matchScore: 85,
+            status: "Perdido"
         )
     ]
+    
     static let chats: [ChatPreview] = [
         ChatPreview(name: "Sofía", lastMessage: "Ya vi el reporte, lo comparto.", time: "10:24"),
         ChatPreview(name: "Rescate MTY", lastMessage: "¿Tienes otra foto de la mascota?", time: "Ayer"),
@@ -135,16 +145,20 @@ enum MockData {
     ]
 
     static let pets: [Pet] = [
-        Pet(name: "Luna", breed: "Labrador", age: "2 años", emoji: "🐶"),
-        Pet(name: "Mimi", breed: "Siamés", age: "4 años", emoji: "🐱"),
-        Pet(name: "Rocky", breed: "Bulldog", age: "1 año", emoji: "🐾"),
-        Pet(name: "Coco", breed: "Poodle", age: "3 años", emoji: "🐩")
+        Pet(name: "Luna", breed: "Labrador Retriever", age: "2 años", type: .dog, emoji: PetType.dog.emoji),
+        Pet(name: "Mimi", breed: "Siamés", age: "4 años", type: .cat, emoji: PetType.cat.emoji),
+        Pet(name: "Tito", breed: "Orejas rojas", age: "3 años", type: .turtle, emoji: PetType.turtle.emoji),
+        Pet(name: "Bunny", breed: "Holandés enano", age: "1 año", type: .rabbit, emoji: PetType.rabbit.emoji),
+        Pet(name: "Pipo", breed: "Sirio dorado", age: "6 meses", type: .hamster, emoji: PetType.hamster.emoji),
+        Pet(name: "Piolín", breed: "Lovebird", age: "2 años", type: .bird, emoji: PetType.bird.emoji)
     ]
 
     static let user = UserProfile(
         name: "Andrea Torres",
         username: "@andreat",
-        petsCount: 2,
+        bio: "Pet lover de Monterrey. Comparto lugares pet friendly y ayudo a difundir reportes de mascotas perdidas. 🐶🐱🐢",
+        city: "Monterrey, Nuevo León",
+        petsCount: 6,
         postsCount: 12,
         reportsCount: 3
     )
