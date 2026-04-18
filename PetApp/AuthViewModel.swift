@@ -30,6 +30,9 @@ class AuthViewModel {
         do {
             let session = try await client.auth.session
             isLoggedIn = session.user.id != UUID(uuidString: "00000000-0000-0000-0000-000000000000")
+            if isLoggedIn {
+                await UserSession.shared.refresh()
+            }
         } catch {
             isLoggedIn = false
         }
@@ -47,6 +50,7 @@ class AuthViewModel {
         do {
             try await AuthService.shared.signIn(email: email, password: password)
             isLoggedIn = true
+            await UserSession.shared.refresh()
         } catch {
             errorMessage = mensajeAmigable(error)
         }
@@ -79,7 +83,9 @@ class AuthViewModel {
                 email: email,
                 password: password
             )
+            isNewUser = true
             isLoggedIn = true
+            await UserSession.shared.refresh()
         } catch {
             errorMessage = mensajeAmigable(error)
         }
@@ -91,6 +97,8 @@ class AuthViewModel {
         do {
             try await AuthService.shared.signOut()
             isLoggedIn = false
+            isNewUser = false
+            UserSession.shared.clear()
         } catch {
             errorMessage = mensajeAmigable(error)
         }

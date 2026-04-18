@@ -8,38 +8,78 @@ import SwiftUI
 
 struct ReportesView: View {
     @StateObject private var vm = ReportesViewModel()
+    @State private var mostrarNuevo = false
+    @State private var seleccion: MascotaPerdida?
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottomTrailing) {
                 AppColors.background.ignoresSafeArea()
 
                 Group {
-                    if vm.isLoading {
+                    if vm.isLoading && vm.reportes.isEmpty {
                         ProgressView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if vm.reportes.isEmpty {
                         ContentUnavailableView(
                             "Sin reportes activos",
                             systemImage: "magnifyingglass",
-                            description: Text("No hay mascotas perdidas reportadas.")
+                            description: Text("Toca el botón + para crear uno.")
                         )
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 16) {
                                 ForEach(vm.reportes) { reporte in
-                                    ReporteCardView(reporte: reporte)
+                                    Button {
+                                        seleccion = reporte
+                                    } label: {
+                                        ReporteCardView(reporte: reporte)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                             .padding(AppSpacing.screenPadding)
+                            .padding(.bottom, 100)
                         }
                     }
                 }
+
+                Button {
+                    mostrarNuevo = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                        Text("Nuevo")
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .background(AppColors.primary)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 6)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
+                .accessibilityLabel("Nuevo reporte")
             }
             .navigationTitle("Desaparecidos")
             .navigationBarTitleDisplayMode(.large)
             .task { await vm.cargarReportes() }
             .refreshable { await vm.cargarReportes() }
+            .sheet(isPresented: $mostrarNuevo) {
+                NuevoReporteView {
+                    Task { await vm.cargarReportes() }
+                }
+                .presentationDetents([.large])
+            }
+            .sheet(item: $seleccion) { rep in
+                ReporteDetailView(reporte: rep) {
+                    Task { await vm.cargarReportes() }
+                }
+                .presentationDetents([.large])
+            }
         }
     }
 }
@@ -50,21 +90,10 @@ struct ReporteCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
 
-            // Badge + foto
             HStack(spacing: 12) {
-                AsyncImage(url: URL(string: reporte.fotoMascota ?? "")) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                    default:
-                        Circle()
-                            .fill(AppColors.softBeige)
-                            .overlay(
-                                Image(systemName: "pawprint.fill")
-                                    .foregroundStyle(AppColors.primary)
-                            )
-                    }
-                }
+                RemoteOrDataImage(urlString: reporte.fotoMascota ?? reporte.fotoReferencia,
+                                  placeholderSystem: "pawprint.fill",
+                                  cornerRadius: 28)
                 .frame(width: 56, height: 56)
                 .clipShape(Circle())
 
@@ -105,7 +134,6 @@ struct ReporteCardView: View {
                 Spacer()
             }
 
-            // Descripción
             if let desc = reporte.descripcion {
                 Text(desc)
                     .font(.subheadline)
@@ -113,7 +141,6 @@ struct ReporteCardView: View {
                     .lineLimit(3)
             }
 
-            // Última ubicación
             if let lugar = reporte.ultimaUbicacionDesc {
                 HStack(spacing: 6) {
                     Image(systemName: "mappin.circle.fill")
@@ -126,7 +153,6 @@ struct ReporteCardView: View {
 
             Divider()
 
-            // Footer
             HStack {
                 HStack(spacing: 4) {
                     Image(systemName: "eye.fill")
