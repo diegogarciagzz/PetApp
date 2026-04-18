@@ -2,23 +2,28 @@
 //  AuthView.swift
 //  PetApp
 //
-//  Created by Alumno on 18/04/26.
+//  REEMPLAZA el AuthView.swift original.
+//  Cambios vs original:
+//    - Usa @State var viewModel = AuthViewModel() en lugar de @State isLoggedIn
+//    - handleLogin() y handleRegister() llaman a AuthViewModel (Supabase real)
+//    - El botón Demo sigue funcionando igual
+//    - Todos los @Binding isLoggedIn → reemplazados por el ViewModel
 //
 
 import SwiftUI
 
 struct AuthView: View {
     @State private var showLogin = true
-    @State private var isLoggedIn = false
+    @State private var viewModel = AuthViewModel()
 
     var body: some View {
-        if isLoggedIn {
+        if viewModel.isLoggedIn {
             MainTabView()
         } else {
             if showLogin {
-                LoginView(isLoggedIn: $isLoggedIn, showLogin: $showLogin)
+                LoginView(viewModel: viewModel, showLogin: $showLogin)
             } else {
-                RegisterView(isLoggedIn: $isLoggedIn, showLogin: $showLogin)
+                RegisterView(viewModel: viewModel, showLogin: $showLogin)
             }
         }
     }
@@ -26,27 +31,22 @@ struct AuthView: View {
 
 // MARK: - LoginView
 struct LoginView: View {
-    @Binding var isLoggedIn: Bool
+    @Bindable var viewModel: AuthViewModel
     @Binding var showLogin: Bool
 
     @State private var email = ""
     @State private var password = ""
-    @State private var isLoading = false
-    @State private var showError = false
 
     var body: some View {
         ZStack {
             AppColors.background.ignoresSafeArea()
 
-            // Fondo decorativo
             VStack {
                 Circle()
                     .fill(AppColors.primary.opacity(0.08))
                     .frame(width: 350, height: 350)
                     .offset(x: 120, y: -100)
-
                 Spacer()
-
                 Circle()
                     .fill(AppColors.softBeige.opacity(0.6))
                     .frame(width: 250, height: 250)
@@ -57,13 +57,12 @@ struct LoginView: View {
             ScrollView {
                 VStack(spacing: 0) {
 
-                    // MARK: - Hero
+                    // Hero
                     VStack(spacing: 16) {
                         ZStack {
                             Circle()
                                 .fill(AppColors.softBeige)
                                 .frame(width: 100, height: 100)
-
                             Text("🐾")
                                 .font(.system(size: 50))
                                 .accessibilityHidden(true)
@@ -81,28 +80,20 @@ struct LoginView: View {
                     }
                     .padding(.bottom, 48)
 
-                    // MARK: - Formulario
+                    // Formulario
                     VStack(spacing: 16) {
-                        authField(
-                            icon: "envelope",
-                            placeholder: "Correo electrónico",
-                            text: $email,
-                            keyboard: .emailAddress
-                        )
+                        authField(icon: "envelope", placeholder: "Correo electrónico",
+                                  text: $email, keyboard: .emailAddress)
+                        authField(icon: "lock", placeholder: "Contraseña",
+                                  text: $password, isSecure: true)
 
-                        authField(
-                            icon: "lock",
-                            placeholder: "Contraseña",
-                            text: $password,
-                            isSecure: true
-                        )
-
-                        if showError {
+                        // Error
+                        if let error = viewModel.errorMessage {
                             HStack(spacing: 6) {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .foregroundStyle(.red)
                                     .accessibilityHidden(true)
-                                Text("Correo o contraseña incorrectos")
+                                Text(error)
                                     .font(.caption)
                                     .foregroundStyle(.red)
                             }
@@ -111,16 +102,13 @@ struct LoginView: View {
 
                         // Botón login
                         Button {
-                            handleLogin()
+                            Task { await viewModel.login(email: email, password: password) }
                         } label: {
                             HStack(spacing: 10) {
-                                if isLoading {
-                                    ProgressView()
-                                        .tint(.white)
-                                        .scaleEffect(0.9)
+                                if viewModel.isLoading {
+                                    ProgressView().tint(.white).scaleEffect(0.9)
                                 } else {
-                                    Text("Iniciar sesión")
-                                        .font(.headline)
+                                    Text("Iniciar sesión").font(.headline)
                                 }
                             }
                             .foregroundStyle(.white)
@@ -130,14 +118,10 @@ struct LoginView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
-                        .disabled(isLoading)
-                        .accessibilityLabel("Iniciar sesión")
+                        .disabled(viewModel.isLoading)
                         .padding(.top, 8)
 
-                        // Olvidé contraseña
-                        Button {
-                            // TODO: recuperar contraseña
-                        } label: {
+                        Button { /* TODO: recuperar contraseña */ } label: {
                             Text("¿Olvidaste tu contraseña?")
                                 .font(.subheadline)
                                 .foregroundStyle(AppColors.primary)
@@ -146,34 +130,22 @@ struct LoginView: View {
                     }
                     .padding(.horizontal, AppSpacing.screenPadding)
 
-                    // MARK: - Divider
+                    // Divider
                     HStack(spacing: 12) {
-                        Rectangle()
-                            .fill(AppColors.textSecondary.opacity(0.3))
-                            .frame(height: 1)
-
-                        Text("o")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        Rectangle()
-                            .fill(AppColors.textSecondary.opacity(0.3))
-                            .frame(height: 1)
+                        Rectangle().fill(AppColors.textSecondary.opacity(0.3)).frame(height: 1)
+                        Text("o").font(.caption).foregroundStyle(AppColors.textSecondary)
+                        Rectangle().fill(AppColors.textSecondary.opacity(0.3)).frame(height: 1)
                     }
                     .padding(.horizontal, AppSpacing.screenPadding)
                     .padding(.vertical, 24)
 
-                    // MARK: - Demo rápido
+                    // Demo
                     Button {
-                        withAnimation {
-                            isLoggedIn = true
-                        }
+                        withAnimation { viewModel.isLoggedIn = true }
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "play.circle.fill")
-                                .accessibilityHidden(true)
-                            Text("Entrar sin cuenta (Demo)")
-                                .font(.subheadline.weight(.semibold))
+                            Image(systemName: "play.circle.fill").accessibilityHidden(true)
+                            Text("Entrar sin cuenta (Demo)").font(.subheadline.weight(.semibold))
                         }
                         .foregroundStyle(AppColors.primary)
                         .frame(maxWidth: .infinity)
@@ -183,24 +155,16 @@ struct LoginView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, AppSpacing.screenPadding)
-                    .accessibilityLabel("Entrar en modo demo sin crear cuenta")
 
-                    // MARK: - Registro
+                    // Ir a registro
                     HStack(spacing: 4) {
-                        Text("¿No tienes cuenta?")
-                            .foregroundStyle(AppColors.textSecondary)
-
+                        Text("¿No tienes cuenta?").foregroundStyle(AppColors.textSecondary)
                         Button {
-                            withAnimation(.easeInOut) {
-                                showLogin = false
-                            }
+                            withAnimation(.easeInOut) { showLogin = false }
                         } label: {
-                            Text("Regístrate")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(AppColors.primary)
+                            Text("Regístrate").fontWeight(.semibold).foregroundStyle(AppColors.primary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Ir a crear una cuenta nueva")
                     }
                     .font(.subheadline)
                     .padding(.top, 24)
@@ -208,33 +172,9 @@ struct LoginView: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: showError)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.errorMessage)
     }
 
-    // MARK: - Lógica login
-    private func handleLogin() {
-        guard !email.isEmpty && !password.isEmpty else {
-            showError = true
-            return
-        }
-        isLoading = true
-        showError = false
-
-        // Simula autenticación
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            isLoading = false
-            // Demo: cualquier credencial funciona
-            if email.contains("@") && password.count >= 4 {
-                withAnimation {
-                    isLoggedIn = true
-                }
-            } else {
-                showError = true
-            }
-        }
-    }
-
-    // MARK: - Campo de texto
     private func authField(
         icon: String,
         placeholder: String,
@@ -247,10 +187,8 @@ struct LoginView: View {
                 .foregroundStyle(AppColors.primary)
                 .frame(width: 20)
                 .accessibilityHidden(true)
-
             if isSecure {
-                SecureField(placeholder, text: text)
-                    .accessibilityLabel(placeholder)
+                SecureField(placeholder, text: text).accessibilityLabel(placeholder)
             } else {
                 TextField(placeholder, text: text)
                     .keyboardType(keyboard)
@@ -261,107 +199,89 @@ struct LoginView: View {
         .padding()
         .background(AppColors.card)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(AppColors.primary.opacity(0.15), lineWidth: 1)
-        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppColors.primary.opacity(0.15), lineWidth: 1))
     }
 }
 
 // MARK: - RegisterView
 struct RegisterView: View {
-    @Binding var isLoggedIn: Bool
+    @Bindable var viewModel: AuthViewModel
     @Binding var showLogin: Bool
 
-    @State private var name = ""
+    @State private var nombre = ""
+    @State private var apellidos = ""
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
-    @State private var isLoading = false
-    @State private var passwordMismatch = false
 
     var body: some View {
         ZStack {
             AppColors.background.ignoresSafeArea()
 
-            // Fondo decorativo
-            VStack {
-                Circle()
-                    .fill(AppColors.softBeige.opacity(0.6))
-                    .frame(width: 300, height: 300)
-                    .offset(x: -120, y: -80)
-                Spacer()
-                Circle()
-                    .fill(AppColors.primary.opacity(0.06))
-                    .frame(width: 280, height: 280)
-                    .offset(x: 120, y: 60)
-            }
-            .ignoresSafeArea()
-
             ScrollView {
                 VStack(spacing: 0) {
 
-                    // MARK: - Header
-                    VStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(AppColors.softBeige)
-                                .frame(width: 90, height: 90)
-                            Text("🐶")
-                                .font(.system(size: 44))
-                                .accessibilityHidden(true)
+                    // Header
+                    HStack {
+                        Button {
+                            withAnimation(.easeInOut) { showLogin = true }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(AppColors.primary)
                         }
-                        .padding(.top, 50)
+                        .buttonStyle(.plain)
+                        Spacer()
+                    }
+                    .padding(.horizontal, AppSpacing.screenPadding)
+                    .padding(.top, 60)
 
+                    VStack(spacing: 8) {
                         Text("Crear cuenta")
                             .font(.title.bold())
                             .foregroundStyle(AppColors.textPrimary)
-
-                        Text("Únete a la comunidad pet lover")
+                        Text("Únete a la comunidad de mascotas")
                             .font(.subheadline)
                             .foregroundStyle(AppColors.textSecondary)
                     }
-                    .padding(.bottom, 36)
+                    .padding(.vertical, 32)
 
-                    // MARK: - Formulario
+                    // Formulario
                     VStack(spacing: 14) {
-                        authField(icon: "person", placeholder: "Nombre completo", text: $name)
+                        registerField(icon: "person",       placeholder: "Nombre",              text: $nombre)
+                        registerField(icon: "person",       placeholder: "Apellidos",           text: $apellidos)
+                        registerField(icon: "envelope",     placeholder: "Correo electrónico",  text: $email, keyboard: .emailAddress)
+                        registerField(icon: "lock",         placeholder: "Contraseña",          text: $password, isSecure: true)
+                        registerField(icon: "lock.shield",  placeholder: "Confirmar contraseña",text: $confirmPassword, isSecure: true)
 
-                        authField(
-                            icon: "envelope",
-                            placeholder: "Correo electrónico",
-                            text: $email,
-                            keyboard: .emailAddress
-                        )
-
-                        authField(icon: "lock", placeholder: "Contraseña", text: $password, isSecure: true)
-
-                        authField(icon: "lock.shield", placeholder: "Confirmar contraseña", text: $confirmPassword, isSecure: true)
-
-                        if passwordMismatch {
+                        // Error
+                        if let error = viewModel.errorMessage {
                             HStack(spacing: 6) {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .foregroundStyle(.red)
                                     .accessibilityHidden(true)
-                                Text("Las contraseñas no coinciden")
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
+                                Text(error).font(.caption).foregroundStyle(.red)
                             }
                             .transition(.opacity)
                         }
 
                         // Botón registrar
                         Button {
-                            handleRegister()
+                            Task {
+                                await viewModel.register(
+                                    nombre: nombre,
+                                    apellidos: apellidos,
+                                    email: email,
+                                    password: password,
+                                    confirmPassword: confirmPassword
+                                )
+                            }
                         } label: {
                             HStack(spacing: 10) {
-                                if isLoading {
-                                    ProgressView()
-                                        .tint(.white)
-                                        .scaleEffect(0.9)
+                                if viewModel.isLoading {
+                                    ProgressView().tint(.white).scaleEffect(0.9)
                                 } else {
-                                    Text("Crear cuenta")
-                                        .font(.headline)
+                                    Text("Crear cuenta").font(.headline)
                                 }
                             }
                             .foregroundStyle(.white)
@@ -371,57 +291,31 @@ struct RegisterView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
-                        .disabled(isLoading)
-                        .accessibilityLabel("Crear cuenta nueva")
+                        .disabled(viewModel.isLoading)
                         .padding(.top, 8)
                     }
                     .padding(.horizontal, AppSpacing.screenPadding)
 
-                    // MARK: - Volver al login
+                    // Ir a login
                     HStack(spacing: 4) {
-                        Text("¿Ya tienes cuenta?")
-                            .foregroundStyle(AppColors.textSecondary)
-
+                        Text("¿Ya tienes cuenta?").foregroundStyle(AppColors.textSecondary)
                         Button {
-                            withAnimation(.easeInOut) {
-                                showLogin = true
-                            }
+                            withAnimation(.easeInOut) { showLogin = true }
                         } label: {
-                            Text("Inicia sesión")
-                                .fontWeight(.semibold)
-                                .foregroundStyle(AppColors.primary)
+                            Text("Inicia sesión").fontWeight(.semibold).foregroundStyle(AppColors.primary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Volver a iniciar sesión")
                     }
                     .font(.subheadline)
-                    .padding(.top, 28)
+                    .padding(.top, 24)
                     .padding(.bottom, 40)
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: passwordMismatch)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.errorMessage)
     }
 
-    private func handleRegister() {
-        guard password == confirmPassword else {
-            passwordMismatch = true
-            return
-        }
-        guard !name.isEmpty && !email.isEmpty && password.count >= 4 else { return }
-
-        passwordMismatch = false
-        isLoading = true
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            isLoading = false
-            withAnimation {
-                isLoggedIn = true
-            }
-        }
-    }
-
-    private func authField(
+    private func registerField(
         icon: String,
         placeholder: String,
         text: Binding<String>,
@@ -433,10 +327,8 @@ struct RegisterView: View {
                 .foregroundStyle(AppColors.primary)
                 .frame(width: 20)
                 .accessibilityHidden(true)
-
             if isSecure {
-                SecureField(placeholder, text: text)
-                    .accessibilityLabel(placeholder)
+                SecureField(placeholder, text: text).accessibilityLabel(placeholder)
             } else {
                 TextField(placeholder, text: text)
                     .keyboardType(keyboard)
@@ -447,13 +339,6 @@ struct RegisterView: View {
         .padding()
         .background(AppColors.card)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(AppColors.primary.opacity(0.15), lineWidth: 1)
-        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppColors.primary.opacity(0.15), lineWidth: 1))
     }
-}
-
-#Preview {
-    AuthView()
 }
