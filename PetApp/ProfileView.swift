@@ -420,10 +420,31 @@ struct ProfileView: View {
             sectionTitle("Opciones")
             profileOption(title: "Mis publicaciones", icon: "photo.on.rectangle")
             profileOption(title: "Mis reportes", icon: "exclamationmark.bubble.fill")
+
+            // 👇 Nuevo botón de amigos
+            if let idMascota = vm.idMascotaActiva {
+                NavigationLink {
+                    AmigosView(idMascota: idMascota)
+                } label: {
+                    HStack {
+                        Image(systemName: "pawprint.circle.fill")
+                            .foregroundStyle(AppColors.primary)
+                        Text("Amigos")
+                            .foregroundStyle(AppColors.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                    .padding()
+                    .background(AppColors.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                }
+                .buttonStyle(.plain)
+            }
+
             profileOption(title: "Configuración", icon: "gearshape.fill")
         }
     }
-
     private func profileOption(title: String, icon: String) -> some View {
         Button {
             selectedMenuTitle = title

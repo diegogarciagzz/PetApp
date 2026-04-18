@@ -13,6 +13,7 @@ import Supabase
 class ProfileViewModel: ObservableObject {
     @Published var fotoPerfilURL: String? = nil
     @Published var isUploadingAvatar = false
+    @Published var idMascotaActiva: UUID? = nil
 
     func cargarPerfil() async {
         guard let userId = SupabaseManager.shared.client.auth.currentUser?.id.uuidString else { return }
@@ -24,6 +25,26 @@ class ProfileViewModel: ObservableObject {
             .execute()
             .value
         fotoPerfilURL = data.first?.fotoPerfil
+        await cargarMascotaActiva()
+    }
+    private func cargarMascotaActiva() async {
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        struct Row: Decodable {
+            let id: UUID
+            enum CodingKeys: String, CodingKey { case id = "id_mascota" }
+        }
+        do {
+            let rows: [Row] = try await SupabaseManager.shared.client
+                .from("mascota")
+                .select("id_mascota")
+                .eq("id_usuario", value: userId.uuidString)
+                .limit(1)
+                .execute()
+                .value
+            idMascotaActiva = rows.first?.id
+        } catch {
+            print("❌ Error cargando mascota activa: \(error)")
+        }
     }
 
     func actualizarAvatar(image: UIImage) async {
