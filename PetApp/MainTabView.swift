@@ -21,7 +21,7 @@ struct MainTabView: View {
                     Label("Mapa", systemImage: "map.fill")
                 }
 
-            ReportsView()
+            ReportesView()
                 .tabItem {
                     Label("Reportes", systemImage: "exclamationmark.bubble.fill")
                 }
