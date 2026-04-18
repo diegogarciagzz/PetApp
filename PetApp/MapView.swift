@@ -4,6 +4,7 @@
 //
 //  Created by Alumno on 18/04/26.
 //
+
 import SwiftUI
 import MapKit
 
@@ -15,6 +16,7 @@ struct MapView: View {
             span: MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12)
         )
     )
+    @State private var selectedPlace: PetPlace?
 
     private let categories = ["Todos", "Parque", "Café", "Paseo"]
 
@@ -40,6 +42,10 @@ struct MapView: View {
                 .padding(AppSpacing.screenPadding)
             }
             .navigationTitle("Mapa")
+            .sheet(item: $selectedPlace) { place in
+                PlaceDetailSheet(place: place)
+                    .presentationDetents([.medium, .large])
+            }
         }
     }
 
@@ -77,11 +83,35 @@ struct MapView: View {
     }
 
     private var mapSection: some View {
-        Map(position: $cameraPosition) {
+        Map(position: $cameraPosition, selection: $selectedPlace) {
             ForEach(filteredPlaces) { place in
-                Marker(place.name, coordinate: place.coordinate)
+                Annotation(place.name, coordinate: place.coordinate) {
+                    Button {
+                        selectedPlace = place
+                        cameraPosition = .region(
+                            MKCoordinateRegion(
+                                center: place.coordinate,
+                                span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+                            )
+                        )
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(AppColors.primary)
+                                .frame(width: 40, height: 40)
+
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(.white)
+                                .shadow(radius: 2)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .tag(place)
             }
         }
+        .mapStyle(.standard)
         .frame(height: 320)
         .clipShape(RoundedRectangle(cornerRadius: 24))
     }
@@ -91,6 +121,7 @@ struct MapView: View {
             VStack(spacing: 12) {
                 ForEach(filteredPlaces) { place in
                     Button {
+                        selectedPlace = place
                         cameraPosition = .region(
                             MKCoordinateRegion(
                                 center: place.coordinate,
@@ -108,14 +139,22 @@ struct MapView: View {
                                     .foregroundStyle(AppColors.primary)
                             }
 
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 6) {
                                 Text(place.name)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(AppColors.textPrimary)
 
-                                Text("\(place.category) • \(place.address)")
+                                Text(place.category)
                                     .font(.caption)
                                     .foregroundStyle(AppColors.textSecondary)
+
+                                HStack(spacing: 4) {
+                                    ForEach(1...5, id: \.self) { star in
+                                        Image(systemName: star <= Int(place.rating) ? "star.fill" : "star")
+                                            .font(.caption)
+                                            .foregroundStyle(AppColors.primary)
+                                    }
+                                }
                             }
 
                             Spacer()
@@ -131,6 +170,187 @@ struct MapView: View {
                 }
             }
         }
+    }
+
+    private func iconForCategory(_ category: String) -> String {
+        switch category {
+        case "Parque":
+            return "leaf.fill"
+        case "Café":
+            return "cup.and.saucer.fill"
+        case "Paseo":
+            return "figure.walk"
+        default:
+            return "mappin.circle.fill"
+        }
+    }
+}
+
+// MARK: - Detail Sheet
+struct PlaceDetailSheet: View {
+    let place: PetPlace
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppColors.background.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 20) {
+                        AsyncImage(url: URL(string: place.photos.first ?? "")) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 24)
+                                    .fill(AppColors.card)
+                                    .frame(height: 240)
+
+                                Image(systemName: iconForCategory(place.category))
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(AppColors.primary.opacity(0.5))
+                            }
+                        }
+                        .frame(height: 240)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text(place.name)
+                                    .font(.title2.bold())
+                                    .foregroundStyle(AppColors.textPrimary)
+                                Spacer()
+                            }
+
+                            HStack {
+                                Image(systemName: iconForCategory(place.category))
+                                    .foregroundStyle(AppColors.primary)
+
+                                Text(place.category)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(AppColors.textPrimary)
+
+                                Spacer()
+                            }
+
+                            Text(place.address)
+                                .font(.subheadline)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+
+                        HStack(spacing: 8) {
+                            HStack(spacing: 2) {
+                                ForEach(1...5, id: \.self) { star in
+                                    Image(systemName: star <= Int(place.rating) ? "star.fill" : "star")
+                                        .font(.title3)
+                                        .foregroundStyle(AppColors.primary)
+                                }
+                            }
+
+                            Text("\(place.rating, specifier: "%.1f") (\(place.reviewCount) opiniones)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppColors.textPrimary)
+
+                            Spacer()
+                        }
+
+                        if !place.petTypes.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Mascotas permitidas")
+                                    .font(.headline)
+                                    .foregroundStyle(AppColors.textPrimary)
+
+                                HStack(spacing: 8) {
+                                    ForEach(place.petTypes.prefix(4), id: \.self) { type in
+                                        VStack(spacing: 4) {
+                                            Text(type.emoji)
+                                                .font(.system(size: 24))
+
+                                            Text(type.rawValue)
+                                                .font(.caption2)
+                                                .foregroundStyle(AppColors.textPrimary)
+                                        }
+                                        .frame(width: 50)
+                                    }
+
+                                    if place.petTypes.count > 4 {
+                                        Text("+\(place.petTypes.count - 4)")
+                                            .font(.caption)
+                                            .foregroundStyle(AppColors.textSecondary)
+                                    }
+                                }
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Comentarios recientes")
+                                .font(.headline)
+                                .foregroundStyle(AppColors.textPrimary)
+
+                            ForEach(place.comments.prefix(3)) { comment in
+                                commentRow(comment)
+                            }
+                        }
+
+                        Spacer(minLength: 100)
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle(place.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cerrar") {
+                        dismiss()
+                    }
+                    .foregroundStyle(AppColors.primary)
+                }
+            }
+        }
+    }
+
+    private func commentRow(_ comment: PlaceComment) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Circle()
+                .fill(AppColors.primary.opacity(0.3))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Image(systemName: "person.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(AppColors.primary)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(comment.userName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Spacer()
+
+                    HStack(spacing: 1) {
+                        ForEach(1...5, id: \.self) { star in
+                            Image(systemName: star <= comment.stars ? "star.fill" : "star")
+                                .font(.caption)
+                                .foregroundStyle(AppColors.primary)
+                        }
+                    }
+                }
+
+                Text(comment.text)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+
+                Text(comment.date)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+        }
+        .padding(.vertical, 8)
     }
 
     private func iconForCategory(_ category: String) -> String {

@@ -18,17 +18,40 @@ struct Post: Identifiable {
     let isFriendPost: Bool
 }
 
-struct PetPlace: Identifiable {
+struct PetPlace: Identifiable, Hashable {
     let id = UUID()
     let name: String
     let category: String
     let address: String
     let latitude: Double
     let longitude: Double
+    let rating: Double
+    let reviewCount: Int
+    let photos: [String]
+    let comments: [PlaceComment]
+    let petTypes: [PetType]
+    let isPetFriendly: Bool
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
+
+    static func == (lhs: PetPlace, rhs: PetPlace) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
+struct PlaceComment: Identifiable, Hashable {
+    let id = UUID()
+    let userName: String
+    let userAvatar: String
+    let text: String
+    let stars: Int
+    let date: String
 }
 
 struct PetReport: Identifiable {
@@ -72,11 +95,11 @@ struct Pet: Identifiable {
     let name: String
     let breed: String
     let age: String
-    let type: PetType  // Cambiado a enum para soportar múltiples tipos
+    let type: PetType
     let emoji: String
 }
 
-enum PetType: String, CaseIterable, Identifiable {
+enum PetType: String, CaseIterable, Identifiable, Hashable {
     case dog = "Perro"
     case cat = "Gato"
     case turtle = "Tortuga"
@@ -84,9 +107,9 @@ enum PetType: String, CaseIterable, Identifiable {
     case hamster = "Hámster"
     case bird = "Pájaro"
     case other = "Otro"
-    
+
     var id: String { rawValue }
-    
+
     var emoji: String {
         switch self {
         case .dog: return "🐶"
