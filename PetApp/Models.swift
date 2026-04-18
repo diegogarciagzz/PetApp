@@ -60,6 +60,8 @@ struct ChatMessage: Identifiable {
 struct UserProfile {
     let name: String
     let username: String
+    let bio: String
+    let city: String
     let petsCount: Int
     let postsCount: Int
     let reportsCount: Int
@@ -70,5 +72,30 @@ struct Pet: Identifiable {
     let name: String
     let breed: String
     let age: String
+    let type: PetType  // Cambiado a enum para soportar múltiples tipos
     let emoji: String
+}
+
+enum PetType: String, CaseIterable, Identifiable {
+    case dog = "Perro"
+    case cat = "Gato"
+    case turtle = "Tortuga"
+    case rabbit = "Conejo"
+    case hamster = "Hámster"
+    case bird = "Pájaro"
+    case other = "Otro"
+    
+    var id: String { rawValue }
+    
+    var emoji: String {
+        switch self {
+        case .dog: return "🐶"
+        case .cat: return "🐱"
+        case .turtle: return "🐢"
+        case .rabbit: return "🐰"
+        case .hamster: return "🐹"
+        case .bird: return "🐦"
+        case .other: return "🐾"
+        }
+    }
 }
