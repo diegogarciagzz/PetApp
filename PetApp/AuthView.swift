@@ -324,4 +324,136 @@ struct RegisterView: View {
                     .padding(.bottom, 36)
 
                     // MARK: - Formulario
-                    VStack(spacing: 14) 
+                    VStack(spacing: 14) {
+                        authField(icon: "person", placeholder: "Nombre completo", text: $name)
+
+                        authField(
+                            icon: "envelope",
+                            placeholder: "Correo electrónico",
+                            text: $email,
+                            keyboard: .emailAddress
+                        )
+
+                        authField(icon: "lock", placeholder: "Contraseña", text: $password, isSecure: true)
+
+                        authField(icon: "lock.shield", placeholder: "Confirmar contraseña", text: $confirmPassword, isSecure: true)
+
+                        if passwordMismatch {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundStyle(.red)
+                                    .accessibilityHidden(true)
+                                Text("Las contraseñas no coinciden")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                            .transition(.opacity)
+                        }
+
+                        // Botón registrar
+                        Button {
+                            handleRegister()
+                        } label: {
+                            HStack(spacing: 10) {
+                                if isLoading {
+                                    ProgressView()
+                                        .tint(.white)
+                                        .scaleEffect(0.9)
+                                } else {
+                                    Text("Crear cuenta")
+                                        .font(.headline)
+                                }
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(AppColors.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isLoading)
+                        .accessibilityLabel("Crear cuenta nueva")
+                        .padding(.top, 8)
+                    }
+                    .padding(.horizontal, AppSpacing.screenPadding)
+
+                    // MARK: - Volver al login
+                    HStack(spacing: 4) {
+                        Text("¿Ya tienes cuenta?")
+                            .foregroundStyle(AppColors.textSecondary)
+
+                        Button {
+                            withAnimation(.easeInOut) {
+                                showLogin = true
+                            }
+                        } label: {
+                            Text("Inicia sesión")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppColors.primary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Volver a iniciar sesión")
+                    }
+                    .font(.subheadline)
+                    .padding(.top, 28)
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: passwordMismatch)
+    }
+
+    private func handleRegister() {
+        guard password == confirmPassword else {
+            passwordMismatch = true
+            return
+        }
+        guard !name.isEmpty && !email.isEmpty && password.count >= 4 else { return }
+
+        passwordMismatch = false
+        isLoading = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            isLoading = false
+            withAnimation {
+                isLoggedIn = true
+            }
+        }
+    }
+
+    private func authField(
+        icon: String,
+        placeholder: String,
+        text: Binding<String>,
+        keyboard: UIKeyboardType = .default,
+        isSecure: Bool = false
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(AppColors.primary)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+
+            if isSecure {
+                SecureField(placeholder, text: text)
+                    .accessibilityLabel(placeholder)
+            } else {
+                TextField(placeholder, text: text)
+                    .keyboardType(keyboard)
+                    .autocapitalization(.none)
+                    .accessibilityLabel(placeholder)
+            }
+        }
+        .padding()
+        .background(AppColors.card)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppColors.primary.opacity(0.15), lineWidth: 1)
+        )
+    }
+}
+
+#Preview {
+    AuthView()
+}

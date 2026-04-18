@@ -1,3 +1,11 @@
+//
+//  MockData.swift
+//  PetApp
+//
+//  Created by Alumno on 18/04/26.
+//
+
+
 import Foundation
 
 enum MockData {
@@ -32,9 +40,41 @@ enum MockData {
     ]
 
     static let places: [PetPlace] = [
-        PetPlace(name: "Parque Rufino Tamayo", category: "Parque", address: "San Pedro"),
-        PetPlace(name: "Pet Coffee MX", category: "Café", address: "Monterrey"),
-        PetPlace(name: "VetCare Center", category: "Veterinaria", address: "Cumbres")
+        PetPlace(
+            name: "Parque Rufino Tamayo",
+            category: "Parque",
+            address: "San Pedro Garza García",
+            latitude: 25.6516,
+            longitude: -100.3567
+        ),
+        PetPlace(
+            name: "Paseo Santa Lucía",
+            category: "Paseo",
+            address: "Centro de Monterrey",
+            latitude: 25.6747,
+            longitude: -100.3090
+        ),
+        PetPlace(
+            name: "Parque Tolteca",
+            category: "Parque",
+            address: "Guadalupe",
+            latitude: 25.6762,
+            longitude: -100.2443
+        ),
+        PetPlace(
+            name: "Warehouse 42",
+            category: "Café",
+            address: "Barrio Antiguo",
+            latitude: 25.6681,
+            longitude: -100.3097
+        ),
+        PetPlace(
+            name: "Mor House",
+            category: "Café",
+            address: "Del Valle, San Pedro",
+            latitude: 25.6503,
+            longitude: -100.3398
+        )
     ]
 
     static let reports: [PetReport] = [
@@ -45,7 +85,8 @@ enum MockData {
             location: "Cumbres",
             hoursAgo: 3,
             details: "Perro mediano con collar azul.",
-            matchScore: 92
+            matchScore: 92,
+            status: "Perdido"
         ),
         PetReport(
             petName: "Nala",
@@ -54,7 +95,8 @@ enum MockData {
             location: "San Jerónimo",
             hoursAgo: 6,
             details: "Gata blanca con mancha gris en la oreja.",
-            matchScore: 78
+            matchScore: 78,
+            status: "Encontrado"
         ),
         PetReport(
             petName: "Rocky",
@@ -63,14 +105,40 @@ enum MockData {
             location: "Contry",
             hoursAgo: 12,
             details: "Lomito grande, muy amigable.",
-            matchScore: 64
+            matchScore: 64,
+            status: "Perdido"
         )
     ]
-
     static let chats: [ChatPreview] = [
         ChatPreview(name: "Sofía", lastMessage: "Ya vi el reporte, lo comparto.", time: "10:24"),
         ChatPreview(name: "Rescate MTY", lastMessage: "¿Tienes otra foto de la mascota?", time: "Ayer"),
         ChatPreview(name: "Carlos", lastMessage: "Creo que lo vi por el parque.", time: "Ayer")
+    ]
+    
+    static let messages: [String: [ChatMessage]] = [
+        "Sofía": [
+            ChatMessage(text: "Hola! Vi el reporte de tu perro 🐶", isFromMe: false, time: "10:20"),
+            ChatMessage(text: "¿Cuándo lo perdiste?", isFromMe: false, time: "10:21"),
+            ChatMessage(text: "Ayer en la noche por Cumbres 😢", isFromMe: true, time: "10:22"),
+            ChatMessage(text: "Ya vi el reporte, lo comparto.", isFromMe: false, time: "10:24"),
+        ],
+        "Rescate MTY": [
+            ChatMessage(text: "Recibimos tu reporte.", isFromMe: false, time: "Ayer"),
+            ChatMessage(text: "¿Tienes otra foto de la mascota?", isFromMe: false, time: "Ayer"),
+            ChatMessage(text: "Sí, te mando una.", isFromMe: true, time: "Ayer"),
+        ],
+        "Carlos": [
+            ChatMessage(text: "Creo que lo vi por el parque.", isFromMe: false, time: "Ayer"),
+            ChatMessage(text: "¿De qué color era su collar?", isFromMe: true, time: "Ayer"),
+            ChatMessage(text: "Azul, creo.", isFromMe: false, time: "Ayer"),
+        ]
+    ]
+
+    static let pets: [Pet] = [
+        Pet(name: "Luna", breed: "Labrador", age: "2 años", emoji: "🐶"),
+        Pet(name: "Mimi", breed: "Siamés", age: "4 años", emoji: "🐱"),
+        Pet(name: "Rocky", breed: "Bulldog", age: "1 año", emoji: "🐾"),
+        Pet(name: "Coco", breed: "Poodle", age: "3 años", emoji: "🐩")
     ]
 
     static let user = UserProfile(
