@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 // MARK: - AuthView (raíz de autenticación)
 struct AuthView: View {
@@ -370,6 +371,8 @@ struct RegisterView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var fotoItem: PhotosPickerItem?
+    @State private var fotoPreview: UIImage?
 
     var body: some View {
         ZStack {
@@ -400,7 +403,50 @@ struct RegisterView: View {
                             .font(.subheadline)
                             .foregroundStyle(AppColors.textSecondary)
                     }
-                    .padding(.vertical, 32)
+                    .padding(.vertical, 24)
+
+                    // Selector de foto de perfil
+                    PhotosPicker(selection: $fotoItem, matching: .images) {
+                        ZStack {
+                            Circle()
+                                .fill(AppColors.softBeige)
+                                .frame(width: 108, height: 108)
+                            if let img = fotoPreview {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 108, height: 108)
+                                    .clipShape(Circle())
+                            } else {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(AppColors.primary)
+                                    Text("Foto")
+                                        .font(.caption2)
+                                        .foregroundStyle(AppColors.textSecondary)
+                                }
+                            }
+                        }
+                        .overlay(
+                            Image(systemName: "pencil.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(AppColors.primary)
+                                .background(Circle().fill(AppColors.background))
+                                .offset(x: 38, y: 38)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.bottom, 16)
+                    .accessibilityLabel("Elegir foto de perfil")
+                    .onChange(of: fotoItem) { _, nuevo in
+                        Task {
+                            if let data = try? await nuevo?.loadTransferable(type: Data.self),
+                               let img = UIImage(data: data) {
+                                fotoPreview = img
+                            }
+                        }
+                    }
 
                     VStack(spacing: 14) {
                         registerField(icon: "person",       placeholder: "Nombre",               text: $nombre)
@@ -426,7 +472,8 @@ struct RegisterView: View {
                                     apellidos: apellidos,
                                     email: email,
                                     password: password,
-                                    confirmPassword: confirmPassword
+                                    confirmPassword: confirmPassword,
+                                    fotoPerfil: fotoPreview
                                 )
                             }
                         } label: {

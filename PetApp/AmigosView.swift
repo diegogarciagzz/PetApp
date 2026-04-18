@@ -17,7 +17,7 @@ struct AmigosView: View {
     @State private var infoMascotas: [UUID: MascotaDB] = [:]
 
     @State private var busqueda = ""
-    @State private var resultados: [MascotaDB] = []
+    @State private var resultados: [MascotaConDueno] = []
     @State private var cargandoBusqueda = false
 
     @State private var cargando = false
@@ -188,8 +188,7 @@ struct AmigosView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(AppColors.textSecondary)
-
-                TextField("Buscar por nombre de mascota...", text: $busqueda)
+                TextField("Buscar dueño por nombre o correo...", text: $busqueda)
                     .autocapitalization(.none)
                     .onSubmit { Task { await buscar() } }
 
@@ -222,20 +221,22 @@ struct AmigosView: View {
             .disabled(cargandoBusqueda || busqueda.trimmingCharacters(in: .whitespaces).isEmpty)
 
             if resultados.isEmpty && !cargandoBusqueda {
-                Text("Escribe un nombre y toca buscar.")
+                Text("Escribe el nombre o correo del dueño y toca buscar.")
                     .font(.caption)
                     .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.center)
                     .padding(.top, 20)
             } else {
-                ForEach(resultados) { m in
+                ForEach(resultados) { r in
                     amistadCard(
-                        nombre: m.nombre,
-                        tipo: m.tipoAnimal,
-                        foto: m.fotoPerfil,
+                        nombre: r.mascota.nombre,
+                        tipo: r.mascota.tipoAnimal,
+                        foto: r.mascota.fotoPerfil,
+                        subtitulo: "Dueño: \(r.dueno.nombre) \(r.dueno.apellidos)".trimmingCharacters(in: .whitespaces),
                         trailing: {
                             AnyView(
                                 Button {
-                                    Task { await enviarSolicitud(a: m) }
+                                    Task { await enviarSolicitud(a: r.mascota) }
                                 } label: {
                                     Text("Enviar")
                                         .font(.caption.weight(.semibold))
@@ -255,7 +256,14 @@ struct AmigosView: View {
         .padding(AppSpacing.screenPadding)
     }
 
-    private func amistadCard(nombre: String, tipo: String?, foto: String?, trailing: () -> AnyView) -> some View {
+    // MARK: - Row
+    private func amistadCard(
+        nombre: String,
+        tipo: String?,
+        foto: String?,
+        subtitulo: String? = nil,
+        trailing: () -> AnyView
+    ) -> some View {
         HStack(spacing: 12) {
             RemoteOrDataImage(urlString: foto, placeholderSystem: "pawprint.fill", cornerRadius: 24)
                 .frame(width: 48, height: 48)
@@ -269,6 +277,11 @@ struct AmigosView: View {
                 if let t = tipo {
                     Text(t)
                         .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+                if let s = subtitulo, !s.isEmpty {
+                    Text(s)
+                        .font(.caption2)
                         .foregroundStyle(AppColors.textSecondary)
                 }
             }
@@ -328,9 +341,9 @@ struct AmigosView: View {
         error = nil
 
         do {
-            resultados = try await SocialService.shared.buscarMascotas(
+            resultados = try await SocialService.shared.buscarPorDueno(
                 query: busqueda,
-                excluyendo: mascotaActual
+                excluyendoMascota: mascotaActual
             )
         } catch {
             self.error = "No se pudo buscar: \(error.localizedDescription)"

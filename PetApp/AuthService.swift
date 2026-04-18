@@ -8,6 +8,7 @@
 
 import Foundation
 import Supabase
+import UIKit
 
 class AuthService {
     static let shared = AuthService()
@@ -15,12 +16,15 @@ class AuthService {
     private init() {}
 
     // MARK: - Registro
-    /// Crea cuenta en Supabase Auth y luego inserta en public.usuario
+    /// Crea cuenta en Supabase Auth y luego inserta en public.usuario.
+    /// Si se pasa una imagen, la sube a storage (o usa data URL fallback) y la guarda
+    /// como `foto_perfil`.
     func signUp(
         nombre: String,
         apellidos: String,
         email: String,
-        password: String
+        password: String,
+        fotoPerfil: UIImage? = nil
     ) async throws {
         // 1. Crear cuenta en Auth
         let response = try await client.auth.signUp(
@@ -30,12 +34,23 @@ class AuthService {
 
         let userId = response.user.id
 
-        // 2. Insertar perfil en public.usuario
+        // 2. Subir foto (si se proveyó)
+        var fotoURL: String? = nil
+        if let img = fotoPerfil {
+            fotoURL = try await StorageManager.shared.subirImagen(
+                img,
+                bucket: StorageManager.Bucket.perfiles,
+                carpeta: userId.uuidString
+            )
+        }
+
+        // 3. Insertar perfil en public.usuario
         let perfil = UsuarioInsert(
             id_usuario: userId,
             nombre: nombre,
             apellidos: apellidos,
-            correo: email
+            correo: email,
+            foto_perfil: fotoURL
         )
 
         try await client
@@ -69,6 +84,7 @@ struct UsuarioInsert: Encodable {
     let nombre: String
     let apellidos: String
     let correo: String
+    let foto_perfil: String?
 }
 
 // MARK: - Errores custom

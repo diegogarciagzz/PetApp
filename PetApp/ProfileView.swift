@@ -25,6 +25,7 @@ struct ProfileView: View {
     @State private var showMyPosts = false
     @State private var showMyReports = false
     @State private var showSettings = false
+    @State private var showAmigos = false
 
     @State private var cargando = false
     @State private var error: String?
@@ -91,6 +92,10 @@ struct ProfileView: View {
                 AjustesView()
                     .environment(authVM)
                     .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showAmigos) {
+                AmigosView()
+                    .presentationDetents([.large])
             }
             .sheet(item: $selectedBadge) { badge in
                 BadgeDetailSheet(badgeTitle: badge)
@@ -432,6 +437,7 @@ struct ProfileView: View {
             sectionTitle("Opciones")
             profileOption(title: "Mis publicaciones", icon: "photo.on.rectangle") { showMyPosts = true }
             profileOption(title: "Mis reportes", icon: "exclamationmark.bubble.fill") { showMyReports = true }
+            profileOption(title: "Amigos", icon: "person.2.fill") { showAmigos = true }
             profileOption(title: "Configuración", icon: "gearshape.fill") { showSettings = true }
         }
     }
@@ -819,10 +825,18 @@ struct AjustesView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthViewModel.self) private var authVM
 
-    @State private var notifPush = true
-    @State private var notifMail = false
-    @State private var modoOscuro = false
+    @AppStorage("notifPush") private var notifPush = true
+    @AppStorage("notifMail") private var notifMail = false
+    @AppStorage("appThemeMode") private var themeModeRaw: String = AppThemeMode.system.rawValue
+
     @State private var confirmarLogout = false
+
+    private var themeBinding: Binding<AppThemeMode> {
+        Binding(
+            get: { AppThemeMode(rawValue: themeModeRaw) ?? .system },
+            set: { themeModeRaw = $0.rawValue }
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -834,10 +848,13 @@ struct AjustesView: View {
                         Toggle("Notificaciones push", isOn: $notifPush)
                         Toggle("Notificaciones por correo", isOn: $notifMail)
                     }
-
-                    Section("Preferencias") {
-                        Toggle("Modo oscuro (próximamente)", isOn: $modoOscuro)
-                            .disabled(true)
+                    Section("Apariencia") {
+                        Picker("Tema", selection: themeBinding) {
+                            Text("Sistema").tag(AppThemeMode.system)
+                            Text("Claro").tag(AppThemeMode.light)
+                            Text("Oscuro").tag(AppThemeMode.dark)
+                        }
+                        .pickerStyle(.segmented)
                     }
 
                     Section("Cuenta") {

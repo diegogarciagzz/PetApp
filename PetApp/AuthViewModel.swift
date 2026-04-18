@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import Supabase
+import UIKit
 
 @MainActor
 @Observable
@@ -63,7 +64,8 @@ class AuthViewModel {
         apellidos: String,
         email: String,
         password: String,
-        confirmPassword: String
+        confirmPassword: String,
+        fotoPerfil: UIImage? = nil
     ) async {
         guard password == confirmPassword else {
             errorMessage = "Las contraseñas no coinciden."
@@ -81,7 +83,8 @@ class AuthViewModel {
                 nombre: nombre,
                 apellidos: apellidos,
                 email: email,
-                password: password
+                password: password,
+                fotoPerfil: fotoPerfil
             )
             isNewUser = true
             isLoggedIn = true
