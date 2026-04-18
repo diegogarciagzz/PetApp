@@ -17,6 +17,9 @@ struct ProfileView: View {
     @State private var petToEdit: Pet? = nil
     @State private var petToDelete: Pet? = nil
     @State private var showDeleteAlert = false
+    @StateObject private var vm = ProfileViewModel()
+    @State private var showImagePicker = false
+    @State private var selectedImage: UIImage? = nil
 
     var body: some View {
         NavigationStack {
@@ -84,38 +87,71 @@ struct ProfileView: View {
     // MARK: - Header
     private var profileHeader: some View {
         VStack(spacing: 14) {
-            Circle()
-                .fill(AppColors.softBeige)
+            ZStack(alignment: .bottomTrailing) {
+                // Foto de perfil
+                Group {
+                    if let urlStr = vm.fotoPerfilURL, let url = URL(string: urlStr) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let img):
+                                img.resizable().scaledToFill()
+                            default:
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 38))
+                                    .foregroundStyle(AppColors.primary)
+                            }
+                        }
+                    } else {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 38))
+                            .foregroundStyle(AppColors.primary)
+                    }
+                }
                 .frame(width: 96, height: 96)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 38))
-                        .foregroundStyle(AppColors.primary)
-                )
-                .accessibilityLabel("Foto de perfil de \(user.name)")
+                .background(AppColors.softBeige)
+                .clipShape(Circle())
+
+                // Botón cámara
+                Button {
+                    showImagePicker = true
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(AppColors.primary)
+                            .frame(width: 28, height: 28)
+                        if vm.isUploadingAvatar {
+                            ProgressView().tint(.white).scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+                .disabled(vm.isUploadingAvatar)
+                .offset(x: 4, y: 4)
+            }
+            .accessibilityLabel("Foto de perfil de \(user.name). Toca para cambiar.")
 
             Text(user.name)
                 .font(.title3.bold())
                 .foregroundStyle(AppColors.textPrimary)
-
-            Text(user.username)
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textSecondary)
-
-            Text(user.city)
-                .font(.caption)
-                .foregroundStyle(AppColors.textSecondary)
-
-            Text(user.bio)
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textPrimary)
-                .multilineTextAlignment(.center)
-                .padding(.top, 4)
+            // ... resto igual
         }
         .frame(maxWidth: .infinity)
         .padding()
         .background(AppColors.card)
         .clipShape(RoundedRectangle(cornerRadius: 24))
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $selectedImage)
+        }
+        .onChange(of: selectedImage) { _, newImage in
+            guard let img = newImage else { return }
+            Task { await vm.actualizarAvatar(image: img) }
+        }
+        .onAppear {
+            Task { await vm.cargarPerfil() }
+        }
     }
 
     // MARK: - Stats

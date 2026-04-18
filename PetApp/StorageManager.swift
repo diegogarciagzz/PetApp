@@ -36,4 +36,18 @@ class StorageManager {
 
         return urlPublica.absoluteString
     }
+    func subirAvatar(userId: String, imageData: Data) async throws -> String {
+        let path = "avatares/\(userId)/avatar.jpg"
+        try await SupabaseManager.shared.client.storage
+            .from("avatares")
+            .upload(path, data: imageData, options: .init(
+                cacheControl: "3600",
+                contentType: "image/jpeg",
+                upsert: true   // sobreescribe si ya existe
+            ))
+        let url = try SupabaseManager.shared.client.storage
+            .from("avatares")
+            .getPublicURL(path: path)
+        return url.absoluteString
+    }
 }

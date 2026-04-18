@@ -113,6 +113,7 @@ struct HomeView: View {
 
 struct PostCardView: View {
     let post: FeedPost
+    @State private var showComentarios = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -198,8 +199,13 @@ struct PostCardView: View {
             HStack(spacing: 18) {
                 Label("\(post.totalReacciones)", systemImage: "heart.fill")
                     .foregroundStyle(.red.opacity(0.8))
-                Label("\(post.totalComentarios)", systemImage: "bubble.left.fill")
-                    .foregroundStyle(AppColors.primary)
+                Button {
+                    showComentarios = true
+                } label: {
+                    Label("\(post.totalComentarios)", systemImage: "bubble.left.fill")
+                        .foregroundStyle(AppColors.primary)
+                }
+                .buttonStyle(.plain)
                 Spacer()
                 Text("Ver más")
                     .font(.caption.weight(.semibold))
@@ -210,6 +216,11 @@ struct PostCardView: View {
         .padding(14)
         .background(AppColors.card)
         .clipShape(RoundedRectangle(cornerRadius: AppSpacing.cardCorner))
+        .sheet(isPresented: $showComentarios) {
+            ComentariosView(post: post)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 }
 
